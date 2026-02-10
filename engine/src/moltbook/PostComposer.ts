@@ -1,14 +1,30 @@
 import { GameResult } from "../game/GameRoom.js";
+import {
+  generateGameBanner,
+  generateEliminationImage,
+  generateWinnerImage,
+  generateMoltbookPostImage,
+  type GeneratedImage,
+} from "../services/ImageGenerator.js";
+import { logger } from "../utils/logger.js";
 
-export function gameStartPost(
+const composerLogger = logger.child("PostComposer");
+
+export interface ComposedPost {
+  text: string;
+  image: GeneratedImage | null;
+}
+
+export async function gameStartPost(
   gameId: string,
-  players: Array<{ address: `0x${string}`; name: string }>
-): string {
+  players: Array<{ address: `0x${string}`; name: string }>,
+  stake?: string
+): Promise<ComposedPost> {
   const playerList = players
     .map((p, i) => `${i + 1}. ${p.name} (${shortenAddress(p.address)})`)
     .join("\n");
 
-  return [
+  const text = [
     `🎮 **AMONG CLAWS** - Game Started!`,
     ``,
     `Game ID: \`${gameId}\``,
@@ -20,6 +36,20 @@ export function gameStartPost(
     ``,
     `#AmongClaws #Monad #AIGaming`,
   ].join("\n");
+
+  let image: GeneratedImage | null = null;
+  try {
+    image = await generateGameBanner(
+      gameId,
+      players.length,
+      stake || "0.5 MON"
+    );
+    composerLogger.info(`Game start image generated (${image.source})`);
+  } catch (err) {
+    composerLogger.warn("Failed to generate game start image", err);
+  }
+
+  return { text, image };
 }
 
 export function discussionComment(
@@ -40,28 +70,43 @@ export function investigationComment(
   return `[Game ${shortenId(gameId)}] ${emoji} **${scannerName}** scanned **${targetName}**: ${result.toUpperCase()}`;
 }
 
-export function voteResultComment(
+export async function voteResultComment(
   gameId: string,
   eliminated: string | null,
   role: string | null,
   round: number
-): string {
+): Promise<ComposedPost> {
   if (!eliminated || !role) {
-    return `[Game ${shortenId(gameId)}] Round ${round}: No one was eliminated (tie vote).`;
+    return {
+      text: `[Game ${shortenId(gameId)}] Round ${round}: No one was eliminated (tie vote).`,
+      image: null,
+    };
   }
 
-  return [
+  const text = [
     `[Game ${shortenId(gameId)}] Round ${round}: **${eliminated}** was eliminated!`,
     `They were a **${role}**.`,
   ].join("\n");
+
+  const wasImpostor = role.toLowerCase() === "impostor";
+
+  let image: GeneratedImage | null = null;
+  try {
+    image = await generateEliminationImage(eliminated, role, wasImpostor);
+    composerLogger.info(`Elimination image generated (${image.source})`);
+  } catch (err) {
+    composerLogger.warn("Failed to generate elimination image", err);
+  }
+
+  return { text, image };
 }
 
-export function gameEndPost(
+export async function gameEndPost(
   gameId: string,
   result: GameResult,
   winners: Array<{ address: `0x${string}`; name: string }>,
   payouts: Map<`0x${string}`, bigint>
-): string {
+): Promise<ComposedPost> {
   const resultText =
     result === GameResult.CrewmatesWin
       ? "CREWMATES WIN!"
@@ -77,7 +122,7 @@ export function gameEndPost(
     })
     .join("\n");
 
-  return [
+  const text = [
     `🏆 **AMONG CLAWS** - Game Over!`,
     ``,
     `Game ID: \`${gameId}\``,
@@ -90,6 +135,17 @@ export function gameEndPost(
     ``,
     `#AmongClaws #Monad #AIGaming`,
   ].join("\n");
+
+  let image: GeneratedImage | null = null;
+  try {
+    const winnerNames = winners.map((w) => w.name);
+    image = await generateWinnerImage(winnerNames, resultText);
+    composerLogger.info(`Winner image generated (${image.source})`);
+  } catch (err) {
+    composerLogger.warn("Failed to generate winner image", err);
+  }
+
+  return { text, image };
 }
 
 export function phaseChangeComment(
@@ -99,6 +155,23 @@ export function phaseChangeComment(
   duration: number
 ): string {
   return `[Game ${shortenId(gameId)}] Round ${round}: **${phaseName}** phase started (${duration}s)`;
+}
+
+/**
+ * Generate a composed Moltbook post with an accompanying AI image.
+ */
+export async function composeMoltbookPost(
+  content: string
+): Promise<ComposedPost> {
+  let image: GeneratedImage | null = null;
+  try {
+    image = await generateMoltbookPostImage(content);
+    composerLogger.info(`Moltbook post image generated (${image.source})`);
+  } catch (err) {
+    composerLogger.warn("Failed to generate Moltbook post image", err);
+  }
+
+  return { text: content, image };
 }
 
 function shortenAddress(address: `0x${string}`): string {

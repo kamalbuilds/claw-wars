@@ -1,8 +1,16 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #030712;
+  --foreground: #f9fafb;
+
+  /* Custom theme colors */
+  --lobster-red: #DC2626;
+  --lobster-red-light: #EF4444;
+  --impostor-purple: #7C3AED;
+  --impostor-purple-light: #8B5CF6;
+  --crewmate-green: #16A34A;
+  --crewmate-green-light: #22C55E;
 }
 
 @theme inline {
@@ -10,17 +18,103 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-lobster-red: var(--lobster-red);
+  --color-lobster-red-light: var(--lobster-red-light);
+  --color-impostor-purple: var(--impostor-purple);
+  --color-impostor-purple-light: var(--impostor-purple-light);
+  --color-crewmate-green: var(--crewmate-green);
+  --color-crewmate-green-light: var(--crewmate-green-light);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #111827;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #374151;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #4b5563;
+}
+
+/* RainbowKit overrides for dark mode */
+[data-rk] {
+  --rk-colors-accentColor: #dc2626 !important;
+}
+
+/* Smooth animations */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 8px 0 rgba(220, 38, 38, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 20px 4px rgba(220, 38, 38, 0.4);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-shimmer {
+  background-size: 200% 100%;
+  animation: shimmer 3s linear infinite;
+}
+
+/* Smooth page transitions */
+main {
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Selection color */
+::selection {
+  background-color: rgba(220, 38, 38, 0.3);
+  color: #fff;
 }

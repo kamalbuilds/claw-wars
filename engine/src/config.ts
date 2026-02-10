@@ -22,6 +22,9 @@ export const config = {
     port: parseInt(process.env.PORT || "3001", 10),
     wsPort: parseInt(process.env.WS_PORT || "3002", 10),
   },
+  gemini: {
+    apiKey: process.env.GEMINI_API_KEY || "",
+  },
   game: {
     defaultStake: BigInt(process.env.DEFAULT_STAKE || "500000000000000000"),
     minPlayers: parseInt(process.env.MIN_PLAYERS || "5", 10),

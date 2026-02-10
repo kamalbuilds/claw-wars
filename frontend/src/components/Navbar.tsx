@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { Shell, Gamepad2, Trophy, Home } from "lucide-react";
+import Image from "next/image";
+import { Gamepad2, Trophy, Home } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 
@@ -25,7 +26,7 @@ export default function Navbar() {
             whileHover={{ rotate: 15 }}
             transition={{ type: "spring", stiffness: 300 }}
           >
-            <Shell className="h-8 w-8 text-red-500" />
+            <Image src="/logo.svg" alt="Among Claws" width={32} height={32} className="rounded-md" />
           </motion.div>
           <span className="text-xl font-bold bg-gradient-to-r from-red-500 to-orange-400 bg-clip-text text-transparent">
             Among Claws
