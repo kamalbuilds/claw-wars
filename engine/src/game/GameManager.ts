@@ -97,32 +97,25 @@ class GameManager {
     }
     this.playerGames.get(normalized)!.add(gameId);
 
-    // Join on-chain
+    // Join on-chain (non-blocking — don't delay the API response)
     if (room.chainGameId !== null) {
-      try {
-        await joinGameOnChain(room.chainGameId, config.game.defaultStake);
-      } catch (err) {
-        managerLogger.error("Failed to join game on-chain", err);
-      }
+      joinGameOnChain(room.chainGameId, config.game.defaultStake).catch((err) => {
+        managerLogger.warn("On-chain join failed (non-blocking)", err instanceof Error ? err.message : String(err));
+      });
     }
 
-    // Auto-start if enough players
-    if (room.canStart() && room.getPlayerCount() === room.getPlayerCount()) {
-      // Check if room is full for auto-start
-      const playerCount = room.getPlayerCount();
-      if (playerCount >= (room as any).maxPlayers || playerCount >= (room as any).minPlayers) {
-        // Wait a short delay to allow more players
-        setTimeout(async () => {
-          if (room.canStart()) {
-            managerLogger.info(`Auto-starting game ${gameId}`);
-            try {
-              await room.start();
-            } catch (err) {
-              managerLogger.error(`Failed to auto-start game ${gameId}`, err);
-            }
+    // Auto-start if enough players (5-second delay to allow more joins)
+    if (room.canStart()) {
+      setTimeout(async () => {
+        if (room.canStart()) {
+          managerLogger.info(`Auto-starting game ${gameId}`);
+          try {
+            await room.start();
+          } catch (err) {
+            managerLogger.error(`Failed to auto-start game ${gameId}`, err);
           }
-        }, 5000);
-      }
+        }
+      }, 5000);
     }
 
     return true;

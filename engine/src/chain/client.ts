@@ -15,16 +15,21 @@ import { logger } from "../utils/logger.js";
 const chainLogger = logger.child("Chain");
 
 const monad = {
-  id: 143,
-  name: "Monad",
+  id: config.monad.chainId,
+  name: config.monad.chainId === 10143 ? "Monad Testnet" : "Monad",
   nativeCurrency: { name: "MON", symbol: "MON", decimals: 18 },
   rpcUrls: {
     default: { http: [config.monad.rpcUrl] },
   },
   blockExplorers: {
-    default: { name: "MonadExplorer", url: "https://monadexplorer.com" },
+    default: {
+      name: "MonadExplorer",
+      url: config.monad.chainId === 10143
+        ? "https://testnet.monadexplorer.com"
+        : "https://monadexplorer.com",
+    },
   },
-} as const satisfies Chain;
+} satisfies Chain;
 
 export { monad };
 

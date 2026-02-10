@@ -236,22 +236,19 @@ export class GameRoom extends EventEmitter {
     // Generate commitments
     const commitments = generateCommitments(this.gameId, roleAssignments);
 
-    // On-chain: start game and commit roles
+    // On-chain: start game and commit roles (non-blocking)
     if (this.onChainEnabled && this.chainGameId !== null) {
-      try {
-        await startGameOnChain(this.chainGameId);
-
-        const agentAddresses = commitments.map((c) => c.address);
-        const commitmentHashes = commitments.map((c) => c.commitment);
-        await commitRolesOnChain(
-          this.chainGameId,
-          agentAddresses,
-          commitmentHashes
-        );
-      } catch (err) {
-        roomLogger.error("On-chain start/commit failed", err);
-        // Continue off-chain if on-chain fails
-      }
+      const chainId = this.chainGameId;
+      (async () => {
+        try {
+          await startGameOnChain(chainId);
+          const agentAddresses = commitments.map((c) => c.address);
+          const commitmentHashes = commitments.map((c) => c.commitment);
+          await commitRolesOnChain(chainId, agentAddresses, commitmentHashes);
+        } catch (err) {
+          roomLogger.warn("On-chain start/commit failed (non-blocking)", err instanceof Error ? err.message : "");
+        }
+      })();
     }
 
     this.roundNumber = 1;
@@ -268,15 +265,9 @@ export class GameRoom extends EventEmitter {
     phaseManager.startPhase(this.gameId, GamePhase.Discussion, duration);
 
     if (this.onChainEnabled && this.chainGameId !== null) {
-      try {
-        await advancePhaseOnChain(
-          this.chainGameId,
-          GamePhase.Discussion,
-          BigInt(duration)
-        );
-      } catch (err) {
-        roomLogger.error("On-chain phase advance failed", err);
-      }
+      advancePhaseOnChain(this.chainGameId, GamePhase.Discussion, BigInt(duration)).catch((err) => {
+        roomLogger.warn("On-chain discussion phase advance failed (non-blocking)");
+      });
     }
 
     this.emit("phaseChange", this.gameId, "Discussion", duration, this.roundNumber);
@@ -290,15 +281,9 @@ export class GameRoom extends EventEmitter {
     phaseManager.startPhase(this.gameId, GamePhase.Voting, duration);
 
     if (this.onChainEnabled && this.chainGameId !== null) {
-      try {
-        await advancePhaseOnChain(
-          this.chainGameId,
-          GamePhase.Voting,
-          BigInt(duration)
-        );
-      } catch (err) {
-        roomLogger.error("On-chain phase advance failed", err);
-      }
+      advancePhaseOnChain(this.chainGameId, GamePhase.Voting, BigInt(duration)).catch((err) => {
+        roomLogger.warn("On-chain voting phase advance failed (non-blocking)");
+      });
     }
 
     this.emit("phaseChange", this.gameId, "Voting", duration, this.roundNumber);
@@ -474,22 +459,22 @@ export class GameRoom extends EventEmitter {
           `${player.name} was eliminated (${roleName}) in round ${this.roundNumber}`
         );
 
-        // Reveal role on-chain
+        // Reveal role on-chain (non-blocking)
         if (this.onChainEnabled && this.chainGameId !== null) {
-          try {
-            await resolveVoteOnChain(this.chainGameId, player.address);
-            const salt = getSalt(this.gameId, player.address);
-            if (salt) {
-              await revealRoleOnChain(
-                this.chainGameId,
-                player.address,
-                player.role,
-                salt
-              );
+          const chainId = this.chainGameId;
+          const addr = player.address;
+          const role = player.role;
+          (async () => {
+            try {
+              await resolveVoteOnChain(chainId, addr);
+              const salt = getSalt(this.gameId, addr);
+              if (salt) {
+                await revealRoleOnChain(chainId, addr, role, salt);
+              }
+            } catch {
+              roomLogger.warn("On-chain vote resolution failed (non-blocking)");
             }
-          } catch (err) {
-            roomLogger.error("On-chain vote resolution failed", err);
-          }
+          })();
         }
 
         this.emit(
@@ -516,13 +501,11 @@ export class GameRoom extends EventEmitter {
       this.phase = GamePhase.End;
       phaseManager.startPhase(this.gameId, GamePhase.End, 0);
 
-      // End on-chain
+      // End on-chain (non-blocking)
       if (this.onChainEnabled && this.chainGameId !== null) {
-        try {
-          await endGameOnChain(this.chainGameId, winResult);
-        } catch (err) {
-          roomLogger.error("On-chain game end failed", err);
-        }
+        endGameOnChain(this.chainGameId, winResult).catch(() => {
+          roomLogger.warn("On-chain game end failed (non-blocking)");
+        });
       }
 
       const winners = this.getWinners();
@@ -540,11 +523,9 @@ export class GameRoom extends EventEmitter {
       phaseManager.startPhase(this.gameId, GamePhase.End, 0);
 
       if (this.onChainEnabled && this.chainGameId !== null) {
-        try {
-          await endGameOnChain(this.chainGameId, GameResult.CrewmatesWin);
-        } catch (err) {
-          roomLogger.error("On-chain game end failed", err);
-        }
+        endGameOnChain(this.chainGameId, GameResult.CrewmatesWin).catch(() => {
+          roomLogger.warn("On-chain game end (max rounds) failed (non-blocking)");
+        });
       }
 
       const winners = this.getWinners();
