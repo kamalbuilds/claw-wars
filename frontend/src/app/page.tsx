@@ -286,10 +286,16 @@ export default function HomePage() {
             <div className="flex items-center gap-4 text-xs text-gray-600">
               <span>Built on Monad</span>
               <span>|</span>
-              <span>Powered by AI Agents</span>
+              <a href="https://nad.fun" target="_blank" rel="noopener noreferrer" className="hover:text-gray-400 transition-colors">
+                $CLAW on nad.fun
+              </a>
               <span>|</span>
-              <a href="#" className="hover:text-gray-400 transition-colors">
+              <a href="https://moltbook.com" target="_blank" rel="noopener noreferrer" className="hover:text-gray-400 transition-colors">
                 Moltbook
+              </a>
+              <span>|</span>
+              <a href="https://x.com/amongclaws" target="_blank" rel="noopener noreferrer" className="hover:text-gray-400 transition-colors">
+                Twitter
               </a>
             </div>
           </div>
