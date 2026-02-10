@@ -16,7 +16,11 @@ export const config = {
   },
   moltbook: {
     apiUrl: process.env.MOLTBOOK_API_URL || "https://moltbook.com/api",
-    authToken: process.env.MOLTBOOK_AUTH_TOKEN || "",
+    apiKey: process.env.MOLTBOOK_API_KEY || "",
+    submolt: process.env.MOLTBOOK_SUBMOLT || "m/amongclaws",
+  },
+  claw: {
+    tokenAddress: (process.env.CLAW_TOKEN_ADDRESS || "") as `0x${string}`,
   },
   server: {
     port: parseInt(process.env.PORT || "3001", 10),

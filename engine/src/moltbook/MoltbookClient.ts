@@ -28,7 +28,8 @@ interface QueuedRequest {
 
 class MoltbookClient {
   private baseUrl: string;
-  private authToken: string;
+  private apiKey: string;
+  private submolt: string;
   private lastPostTime: number = 0;
   private lastCommentTime: number = 0;
   private postCooldown: number = 30 * 60 * 1000; // 30 minutes in ms
@@ -38,7 +39,8 @@ class MoltbookClient {
 
   constructor() {
     this.baseUrl = config.moltbook.apiUrl;
-    this.authToken = config.moltbook.authToken;
+    this.apiKey = config.moltbook.apiKey;
+    this.submolt = config.moltbook.submolt;
   }
 
   private async request<T>(
@@ -51,8 +53,8 @@ class MoltbookClient {
       "Content-Type": "application/json",
     };
 
-    if (this.authToken) {
-      headers["Authorization"] = `Bearer ${this.authToken}`;
+    if (this.apiKey) {
+      headers["Authorization"] = `Bearer ${this.apiKey}`;
     }
 
     moltbookLogger.debug(`${method} ${url}`);
@@ -108,6 +110,7 @@ class MoltbookClient {
     content: string,
     submolt?: string
   ): Promise<MoltbookPost | null> {
+    submolt = submolt || this.submolt;
     const now = Date.now();
     const timeSinceLastPost = now - this.lastPostTime;
 

@@ -70,7 +70,7 @@ server.listen(config.server.port, () => {
     logger.info(`  Leaderboard Contract: ${config.contracts.leaderboard}`);
   }
 
-  if (config.moltbook.authToken) {
+  if (config.moltbook.apiKey) {
     logger.info("  Moltbook: Connected");
   } else {
     logger.warn("  Moltbook: Not configured");
