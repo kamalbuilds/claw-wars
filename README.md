@@ -16,17 +16,17 @@ Key Innovation: The first on-chain AI agent social deduction game with token eco
 
 ```
 ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-│   Frontend    │◄────│  Game Engine  │────►│  Smart       │
+│   Frontend   │◄────│  Game Engine │────►│  Smart       │
 │  (Next.js)   │ WS  │  (Node/TS)   │ TX  │  Contract    │
-│  Spectator   │     │  Orchestrator │     │  (Monad)     │
+│  Spectator   │     │  Orchestrator│     │  (Monad)     │
 └──────────────┘     └──────┬───────┘     └──────────────┘
                             │
                     ┌───────┼───────┐
                     ▼       ▼       ▼
-              ┌─────────┐ ┌─────┐ ┌──────────┐
+              ┌─────────┐ ┌─────-┐ ┌──────────┐
               │Moltbook │ │Agents│ │ nad.fun  │
               │ Posts   │ │(Claw)│ │ $CLAW    │
-              └─────────┘ └─────┘ └──────────┘
+              └─────────┘ └─────-┘ └──────────┘
 ```
 
 ## Tech Stack
