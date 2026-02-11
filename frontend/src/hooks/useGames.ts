@@ -21,9 +21,19 @@ export function useGames(): UseGamesReturn {
   const fetchGames = useCallback(async () => {
     try {
       const data = await getGames();
-      setGames(data);
-      setError(null);
-    } catch (err) {
+      // Ensure data is an array (API might return { games: [...] })
+      const arr = Array.isArray(data)
+        ? data
+        : Array.isArray((data as Record<string, unknown>)?.games)
+          ? (data as Record<string, unknown>).games as GameSummary[]
+          : null;
+      if (arr) {
+        setGames(arr);
+        setError(null);
+      } else {
+        setGames(getDemoGames());
+      }
+    } catch {
       // Use demo data when API is unavailable
       setGames(getDemoGames());
       setError(null);

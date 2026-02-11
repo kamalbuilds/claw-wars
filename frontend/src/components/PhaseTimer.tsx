@@ -13,33 +13,82 @@ interface PhaseTimerProps {
 
 const phaseConfig: Record<
   GamePhase,
-  { label: string; icon: typeof Clock; description: string }
+  {
+    label: string;
+    icon: typeof Clock;
+    description: string;
+    neonClass: string;
+    glowClass: string;
+    phaseGlowClass: string;
+    accentColor: string;
+    gradientFrom: string;
+    gradientTo: string;
+  }
 > = {
   lobby: {
     label: "Lobby",
     icon: Clock,
-    description: "Waiting for players...",
+    description: "Waiting for players to join...",
+    neonClass: "",
+    glowClass: "",
+    phaseGlowClass: "",
+    accentColor: "rgba(148, 163, 184, 0.4)",
+    gradientFrom: "from-gray-500/20",
+    gradientTo: "to-gray-600/5",
   },
   discussion: {
     label: "Discussion",
     icon: MessageCircle,
     description: "Agents are debating who the impostor is",
+    neonClass: "neon-green",
+    glowClass: "glow-green",
+    phaseGlowClass: "phase-discussion",
+    accentColor: "rgba(34, 197, 94, 0.5)",
+    gradientFrom: "from-green-500/20",
+    gradientTo: "to-emerald-500/5",
   },
   voting: {
     label: "Voting",
     icon: Vote,
     description: "Agents are casting their votes",
+    neonClass: "neon-orange",
+    glowClass: "glow-orange",
+    phaseGlowClass: "phase-voting",
+    accentColor: "rgba(251, 146, 60, 0.5)",
+    gradientFrom: "from-orange-500/20",
+    gradientTo: "to-amber-500/5",
   },
   elimination: {
     label: "Elimination",
     icon: Skull,
     description: "Someone is about to be eliminated...",
+    neonClass: "neon-red",
+    glowClass: "glow-red",
+    phaseGlowClass: "phase-elimination",
+    accentColor: "rgba(239, 68, 68, 0.5)",
+    gradientFrom: "from-red-500/20",
+    gradientTo: "to-rose-500/5",
   },
   results: {
     label: "Game Over",
     icon: Trophy,
     description: "The game has concluded",
+    neonClass: "neon-purple",
+    glowClass: "glow-purple",
+    phaseGlowClass: "",
+    accentColor: "rgba(168, 85, 247, 0.5)",
+    gradientFrom: "from-purple-500/20",
+    gradientTo: "to-violet-500/5",
   },
+};
+
+// Max times per phase for progress bar calculation
+const phaseMaxTime: Record<GamePhase, number> = {
+  lobby: 120,
+  discussion: 60,
+  voting: 30,
+  elimination: 15,
+  results: 0,
 };
 
 export default function PhaseTimer({
@@ -50,80 +99,177 @@ export default function PhaseTimer({
   const config = phaseConfig[phase];
   const Icon = config.icon;
   const isLowTime = timeRemaining > 0 && timeRemaining <= 10;
-  const isVoting = phase === "voting";
+  const maxTime = phaseMaxTime[phase] || 60;
+  const progressPercent = maxTime > 0 ? (timeRemaining / maxTime) * 100 : 0;
 
   return (
     <motion.div
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
       className={cn(
-        "relative overflow-hidden rounded-xl border p-4",
-        getPhaseBgColor(phase)
+        "glass-card card-shine relative overflow-hidden rounded-2xl",
+        config.phaseGlowClass
       )}
-      animate={
-        isVoting
-          ? {
-              boxShadow: [
-                "0 0 0 0 rgba(249, 115, 22, 0)",
-                "0 0 20px 5px rgba(249, 115, 22, 0.3)",
-                "0 0 0 0 rgba(249, 115, 22, 0)",
-              ],
-            }
-          : {}
-      }
-      transition={{ duration: 2, repeat: Infinity }}
     >
-      {/* Progress bar background */}
-      {timeRemaining > 0 && (
-        <motion.div
-          className="absolute bottom-0 left-0 h-1 bg-white/10"
-          initial={{ width: "100%" }}
-          animate={{ width: "0%" }}
-          transition={{ duration: timeRemaining, ease: "linear" }}
-        />
-      )}
+      {/* Ambient gradient background */}
+      <div
+        className={cn(
+          "absolute inset-0 bg-gradient-to-br opacity-60 pointer-events-none",
+          config.gradientFrom,
+          config.gradientTo
+        )}
+      />
 
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <motion.div
-            animate={
-              isLowTime
-                ? { scale: [1, 1.2, 1], opacity: [1, 0.5, 1] }
-                : isVoting
-                  ? { rotate: [0, 5, -5, 0] }
-                  : {}
-            }
-            transition={{ duration: 0.5, repeat: Infinity }}
-          >
-            <Icon className={cn("h-6 w-6", getPhaseColor(phase))} />
-          </motion.div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span
-                className={cn("text-lg font-bold", getPhaseColor(phase))}
-              >
-                {config.label}
-              </span>
-              <span className="text-xs text-gray-500 bg-gray-800 px-2 py-0.5 rounded-full">
-                Round {round}
-              </span>
+      {/* Content */}
+      <div className="relative z-10 p-5">
+        <div className="flex items-center justify-between">
+          {/* Left: Icon + Phase Info */}
+          <div className="flex items-center gap-4">
+            {/* Icon with neon glow */}
+            <motion.div
+              className={cn(
+                "relative flex h-12 w-12 items-center justify-center rounded-xl",
+                "bg-white/[0.04] border border-white/[0.06]"
+              )}
+              animate={
+                isLowTime
+                  ? { scale: [1, 1.15, 1], opacity: [1, 0.6, 1] }
+                  : phase === "voting"
+                    ? { rotate: [0, 3, -3, 0] }
+                    : phase === "elimination"
+                      ? { scale: [1, 1.05, 1] }
+                      : {}
+              }
+              transition={{
+                duration: isLowTime ? 0.5 : 1.5,
+                repeat: Infinity,
+                ease: "easeInOut",
+              }}
+            >
+              {/* Icon glow backdrop */}
+              <div
+                className="absolute inset-0 rounded-xl opacity-30 blur-md"
+                style={{ backgroundColor: config.accentColor }}
+              />
+              <Icon
+                className={cn("relative h-6 w-6", config.neonClass || getPhaseColor(phase))}
+              />
+            </motion.div>
+
+            {/* Phase name + description */}
+            <div>
+              <div className="flex items-center gap-3">
+                <motion.span
+                  className={cn(
+                    "text-lg font-bold tracking-tight",
+                    config.neonClass || getPhaseColor(phase)
+                  )}
+                  animate={
+                    phase !== "lobby"
+                      ? {
+                          textShadow: [
+                            `0 0 10px ${config.accentColor}`,
+                            `0 0 20px ${config.accentColor}`,
+                            `0 0 10px ${config.accentColor}`,
+                          ],
+                        }
+                      : {}
+                  }
+                  transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                >
+                  {config.label}
+                </motion.span>
+
+                {/* Round pill */}
+                <span
+                  className={cn(
+                    "inline-flex items-center px-2.5 py-0.5 rounded-full",
+                    "text-[10px] font-bold uppercase tracking-widest",
+                    "bg-white/[0.05] border border-white/[0.08] text-gray-400"
+                  )}
+                >
+                  Round {round}
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 mt-0.5">{config.description}</p>
             </div>
-            <p className="text-xs text-gray-400">{config.description}</p>
           </div>
-        </div>
 
-        {/* Timer */}
-        {timeRemaining > 0 && (
+          {/* Right: Countdown timer */}
+          {timeRemaining > 0 && (
+            <motion.div
+              className={cn(
+                "flex flex-col items-end"
+              )}
+              animate={isLowTime ? { scale: [1, 1.08, 1] } : {}}
+              transition={{ duration: 0.8, repeat: Infinity }}
+            >
+              <motion.span
+                className={cn(
+                  "text-3xl font-mono font-black tabular-nums tracking-tighter",
+                  isLowTime
+                    ? "neon-red animate-text-glow"
+                    : config.neonClass || getPhaseColor(phase)
+                )}
+                animate={
+                  isLowTime
+                    ? { opacity: [1, 0.5, 1] }
+                    : {}
+                }
+                transition={{ duration: 0.5, repeat: Infinity }}
+              >
+                {formatTime(timeRemaining)}
+              </motion.span>
+              {isLowTime && (
+                <motion.span
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: [0.4, 1, 0.4] }}
+                  transition={{ duration: 1, repeat: Infinity }}
+                  className="text-[10px] font-bold uppercase tracking-widest text-red-400 mt-0.5"
+                >
+                  Hurry Up
+                </motion.span>
+              )}
+            </motion.div>
+          )}
+
+          {/* Results: no timer, show trophy glow */}
+          {phase === "results" && (
+            <div className="neon-purple text-xl font-bold tracking-tight">
+              Complete
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Progress bar at bottom */}
+      {timeRemaining > 0 && (
+        <div className="relative h-1 w-full bg-white/[0.03]">
           <motion.div
             className={cn(
-              "text-2xl font-mono font-bold tabular-nums",
-              isLowTime ? "text-red-400" : getPhaseColor(phase)
+              "absolute left-0 top-0 h-full rounded-full",
+              isLowTime
+                ? "bg-gradient-to-r from-red-500 to-red-400"
+                : phase === "discussion"
+                  ? "bg-gradient-to-r from-green-500 to-emerald-400"
+                  : phase === "voting"
+                    ? "bg-gradient-to-r from-orange-500 to-amber-400"
+                    : phase === "elimination"
+                      ? "bg-gradient-to-r from-red-500 to-rose-400"
+                      : "bg-gradient-to-r from-gray-500 to-gray-400"
             )}
-            animate={isLowTime ? { scale: [1, 1.1, 1] } : {}}
-            transition={{ duration: 1, repeat: Infinity }}
-          >
-            {formatTime(timeRemaining)}
-          </motion.div>
-        )}
-      </div>
+            initial={{ width: `${progressPercent}%` }}
+            animate={{ width: "0%" }}
+            transition={{ duration: timeRemaining, ease: "linear" }}
+            style={{
+              boxShadow: isLowTime
+                ? "0 0 12px rgba(239, 68, 68, 0.6)"
+                : `0 0 8px ${config.accentColor}`,
+            }}
+          />
+        </div>
+      )}
     </motion.div>
   );
 }

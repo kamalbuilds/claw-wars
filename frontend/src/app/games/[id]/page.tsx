@@ -51,47 +51,118 @@ export default function GamePage({
   const showLoading = !gameState && !demoLoaded;
 
   return (
-    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
+    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 relative">
+      {/* Ambient background glow */}
+      <div className="absolute top-20 left-1/3 w-80 h-80 bg-red-500/5 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute top-60 right-1/4 w-64 h-64 bg-purple-500/4 rounded-full blur-[100px] pointer-events-none" />
+
       {/* Back link */}
-      <Link
-        href="/games"
-        className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-300 transition-colors mb-4"
+      <motion.div
+        initial={{ opacity: 0, x: -10 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.4 }}
       >
-        <ArrowLeft className="h-3 w-3" />
-        Back to Games
-      </Link>
+        <Link
+          href="/games"
+          className="group inline-flex items-center gap-2 text-sm text-gray-500 hover:text-white transition-all duration-300 mb-6 py-1.5 px-3 -ml-3 rounded-xl hover:bg-white/[0.04]"
+        >
+          <motion.span
+            className="inline-flex"
+            whileHover={{ x: -3 }}
+            transition={{ type: "spring", stiffness: 400, damping: 20 }}
+          >
+            <ArrowLeft className="h-4 w-4 transition-transform duration-300 group-hover:-translate-x-0.5" />
+          </motion.span>
+          <span className="relative">
+            Back to Games
+            <span className="absolute bottom-0 left-0 w-0 h-[1px] bg-gradient-to-r from-gray-400 to-transparent group-hover:w-full transition-all duration-300" />
+          </span>
+        </Link>
+      </motion.div>
 
       {/* Page title */}
-      <div className="mb-6">
-        <h1 className="text-xl font-bold text-white">
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.1 }}
+        className="mb-8"
+      >
+        <h1 className="text-2xl font-black text-white tracking-tight flex items-center gap-2">
           Game{" "}
-          <span className="text-red-400">
+          <span className="neon-red font-mono text-xl">
             #{gameId.split("-").pop() || gameId.slice(-6)}
           </span>
+          {connected && (
+            <motion.span
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              className="inline-flex items-center gap-1.5 ml-3 px-2.5 py-1 rounded-full glass-card text-[10px] font-bold text-green-400 uppercase tracking-widest"
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-400 shadow-[0_0_6px_rgba(34,197,94,0.8)]" />
+              </span>
+              Connected
+            </motion.span>
+          )}
         </h1>
-      </div>
+        <div className="mt-3 h-[1px] bg-gradient-to-r from-red-500/30 via-purple-500/15 to-transparent" />
+      </motion.div>
 
       {showLoading ? (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="flex flex-col items-center justify-center py-32"
+          className="flex flex-col items-center justify-center py-32 relative"
         >
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+          {/* Background pulse */}
+          <div className="absolute w-40 h-40 bg-red-500/5 rounded-full blur-[60px] animate-pulse" />
+
+          <div className="relative">
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+              className="relative"
+            >
+              {/* Outer ring glow */}
+              <div className="absolute inset-0 rounded-full bg-red-500/20 blur-lg animate-pulse-glow" />
+              <div className="relative glass-card rounded-full p-4 glow-red">
+                <Loader2 className="h-8 w-8 neon-red" />
+              </div>
+            </motion.div>
+          </div>
+
+          <motion.p
+            animate={{ opacity: [0.5, 1, 0.5] }}
+            transition={{ duration: 2, repeat: Infinity }}
+            className="text-sm text-gray-400 mt-6 font-medium"
           >
-            <Loader2 className="h-8 w-8 text-red-500" />
-          </motion.div>
-          <p className="text-sm text-gray-500 mt-4">
             Connecting to game server...
+          </motion.p>
+          <p className="text-xs text-gray-600 mt-2 font-mono">
+            WebSocket connecting to game{" "}
+            <span className="text-gray-500">
+              {gameId.slice(0, 12)}...
+            </span>
           </p>
-          <p className="text-xs text-gray-700 mt-1">
-            Attempting WebSocket connection to game {gameId}
-          </p>
+
+          {/* Loading bar */}
+          <div className="mt-6 w-48 h-1 rounded-full bg-gray-800/80 overflow-hidden">
+            <motion.div
+              className="h-full rounded-full bg-gradient-to-r from-red-500/60 to-red-400/40"
+              animate={{ x: ["-100%", "100%"] }}
+              transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+              style={{ width: "40%" }}
+            />
+          </div>
         </motion.div>
       ) : (
-        <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: [0.23, 1, 0.32, 1] }}
+          className="grid grid-cols-1 xl:grid-cols-4 gap-6"
+        >
           {/* Main game viewer */}
           <div className="xl:col-span-3">
             <GameViewer
@@ -119,7 +190,7 @@ export default function GamePage({
               activeBets={activeBets}
             />
           </div>
-        </div>
+        </motion.div>
       )}
     </div>
   );

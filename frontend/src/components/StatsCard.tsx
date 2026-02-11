@@ -13,6 +13,65 @@ interface StatsCardProps {
   delay?: number;
 }
 
+function getGlowFromColor(color: string): string {
+  if (color.includes("red")) return "glow-red";
+  if (color.includes("green")) return "glow-green";
+  if (color.includes("purple") || color.includes("violet")) return "glow-purple";
+  if (color.includes("orange") || color.includes("amber") || color.includes("yellow"))
+    return "glow-orange";
+  return "";
+}
+
+function getIconBgGradient(color: string): string {
+  if (color.includes("red"))
+    return "bg-gradient-to-br from-red-500/20 to-red-600/10 border-red-500/20";
+  if (color.includes("green"))
+    return "bg-gradient-to-br from-green-500/20 to-green-600/10 border-green-500/20";
+  if (color.includes("purple") || color.includes("violet"))
+    return "bg-gradient-to-br from-purple-500/20 to-purple-600/10 border-purple-500/20";
+  if (color.includes("orange") || color.includes("amber"))
+    return "bg-gradient-to-br from-orange-500/20 to-orange-600/10 border-orange-500/20";
+  if (color.includes("yellow"))
+    return "bg-gradient-to-br from-yellow-500/20 to-yellow-600/10 border-yellow-500/20";
+  if (color.includes("cyan") || color.includes("teal"))
+    return "bg-gradient-to-br from-cyan-500/20 to-cyan-600/10 border-cyan-500/20";
+  if (color.includes("blue"))
+    return "bg-gradient-to-br from-blue-500/20 to-blue-600/10 border-blue-500/20";
+  return "bg-gradient-to-br from-gray-500/20 to-gray-600/10 border-gray-500/20";
+}
+
+function getAccentGradient(color: string): string {
+  if (color.includes("red"))
+    return "from-red-400 to-red-600";
+  if (color.includes("green"))
+    return "from-green-400 to-green-600";
+  if (color.includes("purple") || color.includes("violet"))
+    return "from-purple-400 to-purple-600";
+  if (color.includes("orange") || color.includes("amber"))
+    return "from-orange-400 to-orange-600";
+  if (color.includes("yellow"))
+    return "from-yellow-400 to-yellow-600";
+  if (color.includes("cyan") || color.includes("teal"))
+    return "from-cyan-400 to-cyan-600";
+  if (color.includes("blue"))
+    return "from-blue-400 to-blue-600";
+  return "from-gray-400 to-gray-600";
+}
+
+function getShimmerColor(color: string): string {
+  if (color.includes("red")) return "rgba(239, 68, 68, 0.3)";
+  if (color.includes("green")) return "rgba(34, 197, 94, 0.3)";
+  if (color.includes("purple") || color.includes("violet"))
+    return "rgba(168, 85, 247, 0.3)";
+  if (color.includes("orange") || color.includes("amber"))
+    return "rgba(251, 146, 60, 0.3)";
+  if (color.includes("yellow")) return "rgba(234, 179, 8, 0.3)";
+  if (color.includes("cyan") || color.includes("teal"))
+    return "rgba(34, 211, 238, 0.3)";
+  if (color.includes("blue")) return "rgba(59, 130, 246, 0.3)";
+  return "rgba(148, 163, 184, 0.2)";
+}
+
 export default function StatsCard({
   icon: Icon,
   label,
@@ -21,32 +80,112 @@ export default function StatsCard({
   color = "text-red-400",
   delay = 0,
 }: StatsCardProps) {
+  const glowClass = getGlowFromColor(color);
+  const iconBgClass = getIconBgGradient(color);
+  const accentGradient = getAccentGradient(color);
+  const shimmerColor = getShimmerColor(color);
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay, duration: 0.5 }}
-      className="rounded-xl border border-gray-800 bg-gray-900/50 p-4 backdrop-blur-sm"
+      initial={{ opacity: 0, y: 24, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{
+        delay,
+        duration: 0.5,
+        ease: [0.23, 1, 0.32, 1],
+      }}
+      whileHover={{
+        y: -3,
+        transition: { duration: 0.25, ease: "easeOut" },
+      }}
+      className={cn(
+        "glass-card glass-card-hover card-shine relative overflow-hidden rounded-2xl p-5 group cursor-default",
+        glowClass
+      )}
     >
-      <div className="flex items-center gap-3">
-        <div
+      {/* Top shimmer line */}
+      <div
+        className="absolute top-0 left-0 right-0 h-[2px] animate-shimmer"
+        style={{
+          background: `linear-gradient(90deg, transparent, ${shimmerColor}, transparent)`,
+          backgroundSize: "200% 100%",
+        }}
+      />
+
+      {/* Subtle ambient glow */}
+      <div
+        className="absolute -top-8 -right-8 w-24 h-24 rounded-full blur-3xl opacity-20 group-hover:opacity-30 transition-opacity duration-700"
+        style={{
+          background: `radial-gradient(circle, ${shimmerColor}, transparent)`,
+        }}
+      />
+
+      <div className="relative flex items-start gap-4">
+        {/* Animated icon container */}
+        <motion.div
+          animate={{ y: [0, -4, 0] }}
+          transition={{
+            duration: 3,
+            repeat: Infinity,
+            ease: "easeInOut",
+            delay: delay + 0.5,
+          }}
           className={cn(
-            "flex h-10 w-10 items-center justify-center rounded-lg bg-gray-800",
-            color
+            "flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border transition-all duration-300 group-hover:scale-110",
+            iconBgClass
           )}
         >
-          <Icon className="h-5 w-5" />
-        </div>
-        <div>
-          <p className="text-xs text-gray-500 uppercase tracking-wider">
+          <Icon className={cn("h-5.5 w-5.5", color)} />
+        </motion.div>
+
+        {/* Content */}
+        <div className="flex flex-col min-w-0">
+          {/* Label */}
+          <p className="text-[11px] text-gray-500 uppercase tracking-[0.12em] font-medium mb-1.5">
             {label}
           </p>
-          <p className="text-xl font-bold text-white">{value}</p>
+
+          {/* Value with gradient accent */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{
+              delay: delay + 0.3,
+              duration: 0.5,
+              ease: "easeOut",
+            }}
+          >
+            <p
+              className={cn(
+                "text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r leading-tight",
+                accentGradient
+              )}
+            >
+              {value}
+            </p>
+          </motion.div>
+
+          {/* Sub-value */}
           {subValue && (
-            <p className="text-xs text-gray-400">{subValue}</p>
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: delay + 0.5, duration: 0.4 }}
+              className="text-xs text-gray-400 mt-1 truncate"
+            >
+              {subValue}
+            </motion.p>
           )}
         </div>
       </div>
+
+      {/* Bottom accent gradient line */}
+      <div
+        className="absolute bottom-0 left-6 right-6 h-[1px] opacity-20 group-hover:opacity-40 transition-opacity duration-500"
+        style={{
+          background: `linear-gradient(90deg, transparent, ${shimmerColor}, transparent)`,
+        }}
+      />
     </motion.div>
   );
 }

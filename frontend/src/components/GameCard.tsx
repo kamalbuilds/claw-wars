@@ -17,118 +17,369 @@ interface GameCardProps {
   index: number;
 }
 
+function getPhaseNeonClass(phase: string): string {
+  switch (phase.toLowerCase()) {
+    case "discussion":
+      return "neon-green";
+    case "voting":
+      return "neon-orange";
+    case "elimination":
+      return "neon-red";
+    case "results":
+      return "neon-purple";
+    default:
+      return "";
+  }
+}
+
+function getPhaseGlowClass(phase: string): string {
+  switch (phase.toLowerCase()) {
+    case "discussion":
+      return "glow-green";
+    case "voting":
+      return "glow-orange";
+    case "elimination":
+      return "glow-red";
+    case "results":
+      return "glow-purple";
+    default:
+      return "";
+  }
+}
+
+function getPhaseAccentColor(phase: string): string {
+  switch (phase.toLowerCase()) {
+    case "discussion":
+      return "rgba(34, 197, 94, 0.4)";
+    case "voting":
+      return "rgba(251, 146, 60, 0.4)";
+    case "elimination":
+      return "rgba(239, 68, 68, 0.4)";
+    case "results":
+      return "rgba(168, 85, 247, 0.4)";
+    default:
+      return "rgba(148, 163, 184, 0.2)";
+  }
+}
+
+function PlayerDots({
+  count,
+  max,
+  phase,
+}: {
+  count: number;
+  max: number;
+  phase: string;
+}) {
+  const activeColor =
+    phase === "discussion"
+      ? "bg-green-400"
+      : phase === "voting"
+        ? "bg-orange-400"
+        : phase === "elimination"
+          ? "bg-red-400"
+          : phase === "results"
+            ? "bg-purple-400"
+            : "bg-gray-400";
+
+  const activeShadow =
+    phase === "discussion"
+      ? "shadow-[0_0_6px_rgba(34,197,94,0.6)]"
+      : phase === "voting"
+        ? "shadow-[0_0_6px_rgba(251,146,60,0.6)]"
+        : phase === "elimination"
+          ? "shadow-[0_0_6px_rgba(239,68,68,0.6)]"
+          : phase === "results"
+            ? "shadow-[0_0_6px_rgba(168,85,247,0.6)]"
+            : "";
+
+  return (
+    <div className="flex items-center gap-1">
+      {Array.from({ length: max }).map((_, i) => (
+        <motion.div
+          key={i}
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ delay: i * 0.05, type: "spring", stiffness: 300 }}
+          className={cn(
+            "h-2 w-2 rounded-full transition-all duration-300",
+            i < count
+              ? cn(activeColor, activeShadow)
+              : "bg-gray-700/60 border border-gray-600/30"
+          )}
+        />
+      ))}
+    </div>
+  );
+}
+
 export default function GameCard({ game, index }: GameCardProps) {
   const isActive = game.phase !== "results";
   const isLive = isActive && game.phase !== "lobby";
+  const hasWinner = game.winner !== null;
+
+  const winnerGlowClass =
+    game.winner === "lobsters"
+      ? "shadow-[0_0_30px_rgba(34,197,94,0.15),0_0_60px_rgba(34,197,94,0.05)]"
+      : game.winner === "impostor"
+        ? "shadow-[0_0_30px_rgba(168,85,247,0.15),0_0_60px_rgba(168,85,247,0.05)]"
+        : "";
+
+  const winnerBorderClass =
+    game.winner === "lobsters"
+      ? "border-green-500/30"
+      : game.winner === "impostor"
+        ? "border-purple-500/30"
+        : "";
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.1, duration: 0.4 }}
+      initial={{ opacity: 0, y: 30, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{
+        delay: index * 0.08,
+        duration: 0.5,
+        ease: [0.23, 1, 0.32, 1],
+      }}
+      whileHover={{ y: -6, transition: { duration: 0.3, ease: "easeOut" } }}
+      className="group"
     >
       <Link href={`/games/${game.id}`}>
         <div
           className={cn(
-            "group relative overflow-hidden rounded-xl border bg-gray-900/50 p-5 backdrop-blur-sm transition-all duration-300 hover:bg-gray-900/80 hover:border-gray-600 hover:shadow-lg hover:shadow-black/20 cursor-pointer",
-            isActive ? "border-gray-700" : "border-gray-800"
+            "relative overflow-hidden rounded-2xl p-[1px] transition-all duration-500 cursor-pointer",
+            hasWinner ? winnerGlowClass : ""
           )}
         >
-          {/* Live indicator */}
-          {isLive && (
-            <div className="absolute top-3 right-3 flex items-center gap-1.5">
-              <motion.div
-                className="h-2 w-2 rounded-full bg-red-500"
-                animate={{ opacity: [1, 0.3, 1] }}
-                transition={{ duration: 1.5, repeat: Infinity }}
-              />
-              <span className="text-[10px] font-bold text-red-400 uppercase tracking-wider">
-                Live
-              </span>
-            </div>
-          )}
+          {/* Animated gradient border - visible on hover or for active games */}
+          <div
+            className={cn(
+              "absolute inset-0 rounded-2xl opacity-0 transition-opacity duration-500 group-hover:opacity-100",
+              isLive && "opacity-60"
+            )}
+            style={{
+              background: `linear-gradient(135deg, ${getPhaseAccentColor(game.phase)}, rgba(168, 85, 247, 0.2), rgba(34, 211, 238, 0.1), ${getPhaseAccentColor(game.phase)})`,
+              backgroundSize: "300% 300%",
+              animation: "gradient-shift 4s ease infinite",
+            }}
+          />
 
-          {/* Winner badge */}
-          {game.winner && (
-            <div className="absolute top-3 right-3 flex items-center gap-1.5">
-              <Trophy className="h-3.5 w-3.5 text-yellow-500" />
-              <span
-                className={cn(
-                  "text-[10px] font-bold uppercase tracking-wider",
-                  game.winner === "lobsters"
-                    ? "text-green-400"
-                    : "text-purple-400"
-                )}
-              >
-                {game.winner === "lobsters" ? "Lobsters Win" : "Impostor Wins"}
-              </span>
-            </div>
-          )}
+          {/* Inner card */}
+          <div
+            className={cn(
+              "glass-card glass-card-hover card-shine relative rounded-2xl p-5 transition-all duration-500",
+              hasWinner ? winnerBorderClass : "",
+              isLive && getPhaseGlowClass(game.phase)
+            )}
+          >
+            {/* Top shimmer line */}
+            <div
+              className="absolute top-0 left-0 right-0 h-[1px] opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+              style={{
+                background:
+                  "linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent)",
+                backgroundSize: "200% 100%",
+                animation: "shimmer 2s linear infinite",
+              }}
+            />
 
-          {/* Game ID */}
-          <div className="mb-3">
-            <h3 className="text-sm font-bold text-gray-200 group-hover:text-white transition-colors">
-              Game #{game.id.split("-").pop() || game.id.slice(-6)}
-            </h3>
-          </div>
+            {/* Ambient glow behind card on hover */}
+            <div
+              className="absolute inset-0 -z-10 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-700 blur-xl"
+              style={{
+                background: `radial-gradient(ellipse at center, ${getPhaseAccentColor(game.phase)}, transparent 70%)`,
+              }}
+            />
 
-          {/* Phase badge */}
-          <div className="mb-4">
-            <motion.div
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold",
-                getPhaseBgColor(game.phase)
-              )}
-              animate={
-                game.phase === "voting"
-                  ? { scale: [1, 1.02, 1] }
-                  : {}
-              }
-              transition={{ duration: 1, repeat: Infinity }}
-            >
-              <span className={getPhaseColor(game.phase)}>
-                {game.phase.charAt(0).toUpperCase() + game.phase.slice(1)}
-              </span>
-              {game.timeRemaining > 0 && (
-                <>
-                  <span className="text-gray-600">|</span>
-                  <span className="text-gray-400 font-mono">
-                    {formatTime(game.timeRemaining)}
+            {/* ---- Header Row: Game ID + Live/Winner Badge ---- */}
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h3 className="text-sm font-bold text-gray-300 group-hover:text-white transition-colors duration-300 tracking-wide">
+                  Game{" "}
+                  <span className="text-gray-400 font-mono text-xs">
+                    #{game.id.split("-").pop() || game.id.slice(-6)}
                   </span>
-                </>
+                </h3>
+              </div>
+
+              {/* Live indicator with pulse ring */}
+              {isLive && (
+                <div className="flex items-center gap-2">
+                  <div className="relative flex items-center justify-center">
+                    {/* Outer pulse ring */}
+                    <span className="absolute inline-flex h-4 w-4 rounded-full bg-red-500/30 animate-pulse-ring" />
+                    {/* Inner dot */}
+                    <motion.span
+                      className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500 live-dot"
+                      animate={{
+                        boxShadow: [
+                          "0 0 4px rgba(239, 68, 68, 0.6)",
+                          "0 0 12px rgba(239, 68, 68, 0.9)",
+                          "0 0 4px rgba(239, 68, 68, 0.6)",
+                        ],
+                      }}
+                      transition={{ duration: 1.5, repeat: Infinity }}
+                    />
+                  </div>
+                  <span className="text-[10px] font-black text-red-400 uppercase tracking-[0.15em] neon-red">
+                    Live
+                  </span>
+                </div>
               )}
-            </motion.div>
-          </div>
 
-          {/* Stats row */}
-          <div className="grid grid-cols-3 gap-3">
-            <div className="flex items-center gap-1.5">
-              <Users className="h-3.5 w-3.5 text-gray-500" />
-              <span className="text-xs text-gray-400">
-                <span className="text-white font-semibold">
-                  {game.playerCount}
-                </span>
-                /{game.maxPlayers}
-              </span>
+              {/* Winner badge */}
+              {hasWinner && (
+                <motion.div
+                  initial={{ scale: 0, rotate: -12 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  transition={{ type: "spring", stiffness: 200, damping: 12 }}
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-full px-2.5 py-1",
+                    game.winner === "lobsters"
+                      ? "bg-green-500/15 border border-green-500/30"
+                      : "bg-purple-500/15 border border-purple-500/30"
+                  )}
+                >
+                  <Trophy
+                    className={cn(
+                      "h-3 w-3",
+                      game.winner === "lobsters"
+                        ? "text-green-400"
+                        : "text-purple-400"
+                    )}
+                  />
+                  <span
+                    className={cn(
+                      "text-[10px] font-bold uppercase tracking-wider",
+                      game.winner === "lobsters"
+                        ? "neon-green"
+                        : "neon-purple"
+                    )}
+                  >
+                    {game.winner === "lobsters"
+                      ? "Lobsters Win"
+                      : "Impostor Wins"}
+                  </span>
+                </motion.div>
+              )}
             </div>
-            <div className="flex items-center gap-1.5">
-              <Coins className="h-3.5 w-3.5 text-gray-500" />
-              <span className="text-xs text-gray-400">
-                <span className="text-white font-semibold">
-                  {formatMON(game.totalStake)}
-                </span>
-              </span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Clock className="h-3.5 w-3.5 text-gray-500" />
-              <span className="text-xs text-gray-400">
-                R<span className="text-white font-semibold">{game.round}</span>
-              </span>
-            </div>
-          </div>
 
-          {/* Hover glow */}
-          <div className="absolute inset-0 -z-10 bg-gradient-to-r from-red-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+            {/* ---- Phase Badge ---- */}
+            <div className="mb-5">
+              <motion.div
+                className={cn(
+                  "inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-semibold backdrop-blur-sm",
+                  getPhaseBgColor(game.phase)
+                )}
+                animate={
+                  game.phase === "voting"
+                    ? { scale: [1, 1.03, 1] }
+                    : game.phase === "elimination"
+                      ? { scale: [1, 1.02, 1] }
+                      : {}
+                }
+                transition={{ duration: 1.5, repeat: Infinity }}
+              >
+                {/* Phase dot indicator */}
+                <span
+                  className={cn(
+                    "h-1.5 w-1.5 rounded-full",
+                    game.phase === "discussion" && "bg-green-400 shadow-[0_0_6px_rgba(34,197,94,0.8)]",
+                    game.phase === "voting" && "bg-orange-400 shadow-[0_0_6px_rgba(251,146,60,0.8)]",
+                    game.phase === "elimination" && "bg-red-400 shadow-[0_0_6px_rgba(239,68,68,0.8)]",
+                    game.phase === "results" && "bg-purple-400 shadow-[0_0_6px_rgba(168,85,247,0.8)]",
+                    game.phase === "lobby" && "bg-gray-400"
+                  )}
+                />
+
+                <span className={cn(getPhaseNeonClass(game.phase) || getPhaseColor(game.phase))}>
+                  {game.phase.charAt(0).toUpperCase() + game.phase.slice(1)}
+                </span>
+
+                {game.timeRemaining > 0 && (
+                  <>
+                    <span className="text-gray-600/80">|</span>
+                    <span className="text-gray-300 font-mono text-[11px] tabular-nums">
+                      {formatTime(game.timeRemaining)}
+                    </span>
+                  </>
+                )}
+              </motion.div>
+            </div>
+
+            {/* ---- Player Dots Visual ---- */}
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] text-gray-500 uppercase tracking-widest font-medium">
+                  Players
+                </span>
+                <span className="text-[10px] text-gray-500 font-mono">
+                  {game.playerCount}/{game.maxPlayers}
+                </span>
+              </div>
+              <PlayerDots
+                count={game.playerCount}
+                max={game.maxPlayers}
+                phase={game.phase}
+              />
+            </div>
+
+            {/* ---- Stats Row ---- */}
+            <div className="flex items-center gap-0 rounded-xl bg-gray-900/40 border border-gray-800/50 overflow-hidden">
+              {/* Stake */}
+              <div className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3">
+                <Coins className="h-3.5 w-3.5 text-yellow-500/70" />
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-gray-500 uppercase tracking-wider leading-none mb-0.5">
+                    Stake
+                  </span>
+                  <span className="text-xs text-white font-semibold leading-none">
+                    {formatMON(game.totalStake)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Separator */}
+              <div className="w-[1px] h-8 bg-gradient-to-b from-transparent via-gray-700/50 to-transparent" />
+
+              {/* Round */}
+              <div className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3">
+                <Clock className="h-3.5 w-3.5 text-cyan-500/70" />
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-gray-500 uppercase tracking-wider leading-none mb-0.5">
+                    Round
+                  </span>
+                  <span className="text-xs text-white font-semibold leading-none">
+                    {game.round}
+                  </span>
+                </div>
+              </div>
+
+              {/* Separator */}
+              <div className="w-[1px] h-8 bg-gradient-to-b from-transparent via-gray-700/50 to-transparent" />
+
+              {/* Players */}
+              <div className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3">
+                <Users className="h-3.5 w-3.5 text-blue-500/70" />
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-gray-500 uppercase tracking-wider leading-none mb-0.5">
+                    Agents
+                  </span>
+                  <span className="text-xs text-white font-semibold leading-none">
+                    {game.playerCount}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom accent line */}
+            <div
+              className="absolute bottom-0 left-4 right-4 h-[1px] opacity-30 group-hover:opacity-60 transition-opacity duration-500"
+              style={{
+                background: `linear-gradient(90deg, transparent, ${getPhaseAccentColor(game.phase)}, transparent)`,
+              }}
+            />
+          </div>
         </div>
       </Link>
     </motion.div>

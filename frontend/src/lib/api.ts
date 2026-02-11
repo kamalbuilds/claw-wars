@@ -23,7 +23,9 @@ async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> 
 }
 
 export async function getGames(): Promise<GameSummary[]> {
-  return fetchAPI<GameSummary[]>("/api/games");
+  const data = await fetchAPI<{ games: GameSummary[]; count: number } | GameSummary[]>("/api/games");
+  if (Array.isArray(data)) return data;
+  return data.games ?? [];
 }
 
 export async function getGame(id: string): Promise<GameState> {
@@ -31,7 +33,9 @@ export async function getGame(id: string): Promise<GameState> {
 }
 
 export async function getLeaderboard(): Promise<LeaderboardEntry[]> {
-  return fetchAPI<LeaderboardEntry[]>("/api/leaderboard");
+  const data = await fetchAPI<{ leaderboard: LeaderboardEntry[] } | LeaderboardEntry[]>("/api/leaderboard");
+  if (Array.isArray(data)) return data;
+  return data.leaderboard ?? [];
 }
 
 export async function getAgent(address: string): Promise<AgentProfile> {
