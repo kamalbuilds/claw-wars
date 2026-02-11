@@ -7,10 +7,23 @@ import type {
   BettingOdds,
 } from "./types";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+// In production, use /engine proxy (avoids mixed content HTTPS→HTTP).
+// In development, call the engine directly.
+const API_URL =
+  typeof window !== "undefined" && window.location.protocol === "https:"
+    ? "" // use Next.js rewrite proxy at /engine
+    : process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+
+function getApiBase(endpoint: string): string {
+  if (API_URL === "") {
+    // Rewrite /api/... → /engine/api/...
+    return `/engine${endpoint}`;
+  }
+  return `${API_URL}${endpoint}`;
+}
 
 async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_URL}${endpoint}`, {
+  const res = await fetch(getApiBase(endpoint), {
     headers: {
       "Content-Type": "application/json",
     },
