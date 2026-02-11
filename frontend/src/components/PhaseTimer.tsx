@@ -126,60 +126,29 @@ export default function PhaseTimer({
         <div className="flex items-center justify-between">
           {/* Left: Icon + Phase Info */}
           <div className="flex items-center gap-4">
-            {/* Icon with neon glow */}
-            <motion.div
+            {/* Icon */}
+            <div
               className={cn(
-                "relative flex h-12 w-12 items-center justify-center rounded-xl",
+                "flex h-10 w-10 items-center justify-center rounded-lg",
                 "bg-white/[0.04] border border-white/[0.06]"
               )}
-              animate={
-                isLowTime
-                  ? { scale: [1, 1.15, 1], opacity: [1, 0.6, 1] }
-                  : phase === "voting"
-                    ? { rotate: [0, 3, -3, 0] }
-                    : phase === "elimination"
-                      ? { scale: [1, 1.05, 1] }
-                      : {}
-              }
-              transition={{
-                duration: isLowTime ? 0.5 : 1.5,
-                repeat: Infinity,
-                ease: "easeInOut",
-              }}
             >
-              {/* Icon glow backdrop */}
-              <div
-                className="absolute inset-0 rounded-xl opacity-30 blur-md"
-                style={{ backgroundColor: config.accentColor }}
-              />
               <Icon
-                className={cn("relative h-6 w-6", config.neonClass || getPhaseColor(phase))}
+                className={cn("h-5 w-5", config.neonClass || getPhaseColor(phase))}
               />
-            </motion.div>
+            </div>
 
             {/* Phase name + description */}
             <div>
               <div className="flex items-center gap-3">
-                <motion.span
+                <span
                   className={cn(
                     "text-lg font-bold tracking-tight",
                     config.neonClass || getPhaseColor(phase)
                   )}
-                  animate={
-                    phase !== "lobby"
-                      ? {
-                          textShadow: [
-                            `0 0 10px ${config.accentColor}`,
-                            `0 0 20px ${config.accentColor}`,
-                            `0 0 10px ${config.accentColor}`,
-                          ],
-                        }
-                      : {}
-                  }
-                  transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
                 >
                   {config.label}
-                </motion.span>
+                </span>
 
                 {/* Round pill */}
                 <span
@@ -198,40 +167,23 @@ export default function PhaseTimer({
 
           {/* Right: Countdown timer */}
           {timeRemaining > 0 && (
-            <motion.div
-              className={cn(
-                "flex flex-col items-end"
-              )}
-              animate={isLowTime ? { scale: [1, 1.08, 1] } : {}}
-              transition={{ duration: 0.8, repeat: Infinity }}
-            >
-              <motion.span
+            <div className="flex flex-col items-end">
+              <span
                 className={cn(
-                  "text-3xl font-mono font-black tabular-nums tracking-tighter",
+                  "text-3xl font-mono font-bold tabular-nums tracking-tighter",
                   isLowTime
-                    ? "neon-red animate-text-glow"
+                    ? "text-red-400"
                     : config.neonClass || getPhaseColor(phase)
                 )}
-                animate={
-                  isLowTime
-                    ? { opacity: [1, 0.5, 1] }
-                    : {}
-                }
-                transition={{ duration: 0.5, repeat: Infinity }}
               >
                 {formatTime(timeRemaining)}
-              </motion.span>
+              </span>
               {isLowTime && (
-                <motion.span
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: [0.4, 1, 0.4] }}
-                  transition={{ duration: 1, repeat: Infinity }}
-                  className="text-[10px] font-bold uppercase tracking-widest text-red-400 mt-0.5"
-                >
-                  Hurry Up
-                </motion.span>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-red-400/70 mt-0.5">
+                  Low time
+                </span>
               )}
-            </motion.div>
+            </div>
           )}
 
           {/* Results: no timer, show trophy glow */}
@@ -245,28 +197,23 @@ export default function PhaseTimer({
 
       {/* Progress bar at bottom */}
       {timeRemaining > 0 && (
-        <div className="relative h-1 w-full bg-white/[0.03]">
+        <div className="relative h-0.5 w-full bg-white/[0.03]">
           <motion.div
             className={cn(
               "absolute left-0 top-0 h-full rounded-full",
               isLowTime
-                ? "bg-gradient-to-r from-red-500 to-red-400"
+                ? "bg-red-500"
                 : phase === "discussion"
-                  ? "bg-gradient-to-r from-green-500 to-emerald-400"
+                  ? "bg-green-500"
                   : phase === "voting"
-                    ? "bg-gradient-to-r from-orange-500 to-amber-400"
+                    ? "bg-orange-500"
                     : phase === "elimination"
-                      ? "bg-gradient-to-r from-red-500 to-rose-400"
-                      : "bg-gradient-to-r from-gray-500 to-gray-400"
+                      ? "bg-red-500"
+                      : "bg-gray-500"
             )}
             initial={{ width: `${progressPercent}%` }}
             animate={{ width: "0%" }}
             transition={{ duration: timeRemaining, ease: "linear" }}
-            style={{
-              boxShadow: isLowTime
-                ? "0 0 12px rgba(239, 68, 68, 0.6)"
-                : `0 0 8px ${config.accentColor}`,
-            }}
           />
         </div>
       )}

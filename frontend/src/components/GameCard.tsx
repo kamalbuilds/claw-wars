@@ -151,45 +151,14 @@ export default function GameCard({ game, index }: GameCardProps) {
             hasWinner ? winnerGlowClass : ""
           )}
         >
-          {/* Animated gradient border - visible on hover or for active games */}
-          <div
-            className={cn(
-              "absolute inset-0 rounded-2xl opacity-0 transition-opacity duration-500 group-hover:opacity-100",
-              isLive && "opacity-60"
-            )}
-            style={{
-              background: `linear-gradient(135deg, ${getPhaseAccentColor(game.phase)}, rgba(168, 85, 247, 0.2), rgba(34, 211, 238, 0.1), ${getPhaseAccentColor(game.phase)})`,
-              backgroundSize: "300% 300%",
-              animation: "gradient-shift 4s ease infinite",
-            }}
-          />
-
           {/* Inner card */}
           <div
             className={cn(
-              "glass-card glass-card-hover card-shine relative rounded-2xl p-5 transition-all duration-500",
+              "glass-card glass-card-hover relative rounded-2xl p-5 transition-all duration-300",
               hasWinner ? winnerBorderClass : "",
               isLive && getPhaseGlowClass(game.phase)
             )}
           >
-            {/* Top shimmer line */}
-            <div
-              className="absolute top-0 left-0 right-0 h-[1px] opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-              style={{
-                background:
-                  "linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent)",
-                backgroundSize: "200% 100%",
-                animation: "shimmer 2s linear infinite",
-              }}
-            />
-
-            {/* Ambient glow behind card on hover */}
-            <div
-              className="absolute inset-0 -z-10 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-700 blur-xl"
-              style={{
-                background: `radial-gradient(ellipse at center, ${getPhaseAccentColor(game.phase)}, transparent 70%)`,
-              }}
-            />
 
             {/* ---- Header Row: Game ID + Live/Winner Badge ---- */}
             <div className="flex items-start justify-between mb-4">
@@ -202,26 +171,14 @@ export default function GameCard({ game, index }: GameCardProps) {
                 </h3>
               </div>
 
-              {/* Live indicator with pulse ring */}
+              {/* Live indicator */}
               {isLive && (
-                <div className="flex items-center gap-2">
-                  <div className="relative flex items-center justify-center">
-                    {/* Outer pulse ring */}
-                    <span className="absolute inline-flex h-4 w-4 rounded-full bg-red-500/30 animate-pulse-ring" />
-                    {/* Inner dot */}
-                    <motion.span
-                      className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500 live-dot"
-                      animate={{
-                        boxShadow: [
-                          "0 0 4px rgba(239, 68, 68, 0.6)",
-                          "0 0 12px rgba(239, 68, 68, 0.9)",
-                          "0 0 4px rgba(239, 68, 68, 0.6)",
-                        ],
-                      }}
-                      transition={{ duration: 1.5, repeat: Infinity }}
-                    />
-                  </div>
-                  <span className="text-[10px] font-black text-red-400 uppercase tracking-[0.15em] neon-red">
+                <div className="flex items-center gap-1.5">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-50" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
+                  </span>
+                  <span className="text-[10px] font-bold text-red-400 uppercase tracking-wider">
                     Live
                   </span>
                 </div>
@@ -372,13 +329,6 @@ export default function GameCard({ game, index }: GameCardProps) {
               </div>
             </div>
 
-            {/* Bottom accent line */}
-            <div
-              className="absolute bottom-0 left-4 right-4 h-[1px] opacity-30 group-hover:opacity-60 transition-opacity duration-500"
-              style={{
-                background: `linear-gradient(90deg, transparent, ${getPhaseAccentColor(game.phase)}, transparent)`,
-              }}
-            />
           </div>
         </div>
       </Link>

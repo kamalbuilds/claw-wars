@@ -24,15 +24,13 @@ export default function Navbar() {
       {/* Glass background with gradient border bottom */}
       <div className="relative">
         {/* Backdrop */}
-        <div className="absolute inset-0 bg-[#020617]/70 backdrop-blur-2xl" />
+        <div className="absolute inset-0 bg-[#020617]/85 backdrop-blur-xl" />
 
-        {/* Animated gradient bottom border */}
+        {/* Bottom border */}
         <div
-          className="absolute bottom-0 left-0 right-0 h-[1px] animate-gradient"
+          className="absolute bottom-0 left-0 right-0 h-[1px]"
           style={{
-            backgroundImage:
-              "linear-gradient(90deg, transparent, rgba(239, 68, 68, 0.4), rgba(168, 85, 247, 0.4), rgba(34, 211, 238, 0.3), rgba(239, 68, 68, 0.4), transparent)",
-            backgroundSize: "200% 100%",
+            backgroundImage: "linear-gradient(90deg, transparent, rgba(148, 163, 184, 0.08), transparent)",
           }}
         />
 
@@ -40,13 +38,7 @@ export default function Navbar() {
         <div className="relative mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-3 group">
-            <motion.div
-              whileHover={{ rotate: 15, scale: 1.1 }}
-              transition={{ type: "spring", stiffness: 300, damping: 15 }}
-              className="relative"
-            >
-              {/* Logo glow */}
-              <div className="absolute inset-0 rounded-lg bg-red-500/20 blur-lg opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            <div className="relative">
               <Image
                 src="/logo.svg"
                 alt="Among Claws"
@@ -54,16 +46,11 @@ export default function Navbar() {
                 height={34}
                 className="relative rounded-lg"
               />
-            </motion.div>
-            <motion.span
-              className="text-xl font-black tracking-tight"
-              whileHover={{ scale: 1.02 }}
-            >
-              <span className="bg-gradient-to-r from-red-400 via-orange-400 to-red-500 bg-clip-text text-transparent animate-text-glow">
-                Among
-              </span>
+            </div>
+            <span className="text-xl font-black tracking-tight">
+              <span className="text-red-400">Among</span>
               <span className="text-gray-300 ml-1">Claws</span>
-            </motion.span>
+            </span>
           </Link>
 
           {/* Desktop Nav Links */}

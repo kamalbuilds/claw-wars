@@ -44,10 +44,10 @@ function getPhaseAccent(phase: GamePhase | null) {
   switch (phase) {
     case "discussion":
       return {
-        border: "border-green-500/20",
+        border: "border-green-500/10",
         glow: "phase-discussion",
         accent: "#22c55e",
-        accentFaded: "rgba(34,197,94,0.08)",
+        accentFaded: "rgba(34,197,94,0.03)",
         neonClass: "neon-green",
         glowClass: "glow-green",
         dotColor: "bg-green-400",
@@ -55,10 +55,10 @@ function getPhaseAccent(phase: GamePhase | null) {
       };
     case "voting":
       return {
-        border: "border-orange-500/20",
+        border: "border-orange-500/10",
         glow: "phase-voting",
         accent: "#fb923c",
-        accentFaded: "rgba(251,146,60,0.08)",
+        accentFaded: "rgba(251,146,60,0.03)",
         neonClass: "neon-orange",
         glowClass: "glow-orange",
         dotColor: "bg-orange-400",
@@ -66,10 +66,10 @@ function getPhaseAccent(phase: GamePhase | null) {
       };
     case "elimination":
       return {
-        border: "border-red-500/20",
+        border: "border-red-500/10",
         glow: "phase-elimination",
         accent: "#ef4444",
-        accentFaded: "rgba(239,68,68,0.08)",
+        accentFaded: "rgba(239,68,68,0.03)",
         neonClass: "neon-red",
         glowClass: "glow-red",
         dotColor: "bg-red-400",
@@ -77,10 +77,10 @@ function getPhaseAccent(phase: GamePhase | null) {
       };
     case "results":
       return {
-        border: "border-purple-500/20",
+        border: "border-purple-500/10",
         glow: "",
         accent: "#a855f7",
-        accentFaded: "rgba(168,85,247,0.08)",
+        accentFaded: "rgba(168,85,247,0.03)",
         neonClass: "neon-purple",
         glowClass: "glow-purple",
         dotColor: "bg-purple-400",
@@ -88,10 +88,10 @@ function getPhaseAccent(phase: GamePhase | null) {
       };
     default:
       return {
-        border: "border-gray-700/30",
+        border: "border-gray-700/20",
         glow: "",
         accent: "#64748b",
-        accentFaded: "rgba(100,116,139,0.05)",
+        accentFaded: "rgba(100,116,139,0.02)",
         neonClass: "",
         glowClass: "",
         dotColor: "bg-gray-500",
@@ -343,14 +343,10 @@ export default function GameViewer({
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.9 }}
-                className="inline-flex items-center gap-3 px-6 py-3 rounded-2xl glass-card"
-                style={{
-                  boxShadow: "0 0 20px rgba(250,204,21,0.15), inset 0 0 20px rgba(250,204,21,0.05)",
-                  border: "1px solid rgba(250,204,21,0.2)",
-                }}
+                className="inline-flex items-center gap-3 px-6 py-3 rounded-xl glass-card border border-yellow-500/15"
               >
-                <Crown className="h-6 w-6 text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.5)]" />
-                <span className="font-black text-xl text-yellow-400 neon-orange">
+                <Crown className="h-5 w-5 text-yellow-400" />
+                <span className="font-bold text-lg text-yellow-400">
                   Pot: {formatMON(totalStake)}
                 </span>
               </motion.div>
@@ -365,47 +361,32 @@ export default function GameViewer({
         <div className="lg:col-span-2 space-y-5">
           {/* Connection status pill */}
           <div className="flex items-center gap-3">
-            <motion.div
+            <div
               className={cn(
-                "flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-semibold backdrop-blur-sm transition-all",
+                "flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-medium transition-all",
                 connected
-                  ? "bg-green-500/8 text-green-400 border border-green-500/25"
-                  : "bg-red-500/8 text-red-400 border border-red-500/25"
+                  ? "text-green-400 border border-green-500/15 bg-green-500/5"
+                  : "text-red-400 border border-red-500/15 bg-red-500/5"
               )}
-              style={{
-                boxShadow: connected
-                  ? "0 0 12px rgba(34,197,94,0.1), inset 0 0 12px rgba(34,197,94,0.03)"
-                  : "0 0 12px rgba(239,68,68,0.1), inset 0 0 12px rgba(239,68,68,0.03)",
-              }}
-              animate={
-                connected
-                  ? {}
-                  : { opacity: [1, 0.6, 1] }
-              }
-              transition={{ duration: 2, repeat: Infinity }}
             >
               {connected ? (
                 <Wifi className="h-3.5 w-3.5" />
               ) : (
                 <WifiOff className="h-3.5 w-3.5" />
               )}
-              <span>{connected ? "Live" : "Disconnected"}</span>
+              <span>{connected ? "Connected" : "Disconnected"}</span>
               {connected && (
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-50" />
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500" />
                 </span>
               )}
-            </motion.div>
+            </div>
 
             {error && (
-              <motion.span
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="text-xs text-red-400 bg-red-500/8 px-3 py-1 rounded-full border border-red-500/20"
-              >
+              <span className="text-xs text-red-400/80 px-3 py-1 rounded-full border border-red-500/10 bg-red-500/5">
                 {error}
-              </motion.span>
+              </span>
             )}
           </div>
 
@@ -421,32 +402,29 @@ export default function GameViewer({
           {/* ─── Player Arena ─── */}
           <div
             className={cn(
-              "rounded-2xl p-5 card-shine glass-card transition-all duration-700",
+              "rounded-2xl p-5 glass-card transition-all duration-500",
               accent.glow
             )}
           >
-            <div className="flex items-center justify-between mb-5">
-              <h3
-                className="text-sm font-bold text-gray-300 flex items-center gap-2.5"
-                style={{ textShadow: `0 0 10px ${accent.accent}30` }}
-              >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-gray-400 flex items-center gap-2">
                 <Users className="h-4 w-4" style={{ color: accent.accent }} />
                 <span>
-                  Arena{" "}
-                  <span className="text-gray-500 font-normal ml-1">
-                    {alivePlayers.length} alive / {players.length} total
+                  Arena
+                  <span className="text-gray-600 font-normal ml-2 text-xs">
+                    {alivePlayers.length}/{players.length}
                   </span>
                 </span>
               </h3>
               {phase && (
                 <div
                   className={cn(
-                    "text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full border",
-                    phase === "discussion" && "border-green-500/30 text-green-400 bg-green-500/8",
-                    phase === "voting" && "border-orange-500/30 text-orange-400 bg-orange-500/8",
-                    phase === "elimination" && "border-red-500/30 text-red-400 bg-red-500/8",
-                    phase === "results" && "border-purple-500/30 text-purple-400 bg-purple-500/8",
-                    phase === "lobby" && "border-gray-500/30 text-gray-400 bg-gray-500/8"
+                    "text-[10px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-md",
+                    phase === "discussion" && "text-green-400 bg-green-500/8",
+                    phase === "voting" && "text-orange-400 bg-orange-500/8",
+                    phase === "elimination" && "text-red-400 bg-red-500/8",
+                    phase === "results" && "text-purple-400 bg-purple-500/8",
+                    phase === "lobby" && "text-gray-500 bg-gray-500/8"
                   )}
                 >
                   {phase}
@@ -520,36 +498,25 @@ export default function GameViewer({
                 exit={{ height: 0, opacity: 0 }}
                 className="overflow-hidden"
               >
-                <div
-                  className="rounded-2xl p-5 glass-card glow-orange card-shine"
-                  style={{
-                    border: "1px solid rgba(251,146,60,0.15)",
-                  }}
-                >
+                <div className="rounded-2xl p-5 glass-card border-orange-500/10">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-sm font-bold neon-orange flex items-center gap-2">
-                      <motion.div
-                        animate={{ rotate: [0, 10, -10, 0] }}
-                        transition={{ duration: 2, repeat: Infinity }}
+                    <h3 className="text-sm font-semibold text-orange-400 flex items-center gap-2">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        className="h-4 w-4"
+                        stroke="currentColor"
+                        strokeWidth={2}
                       >
-                        <svg
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          className="h-4 w-4"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                        >
-                          <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                      </motion.div>
+                        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
                       Vote Tracker
                     </h3>
-                    <span className="text-[10px] text-gray-500 font-medium">
+                    <span className="text-[10px] text-gray-500 font-mono">
                       {Object.values(voteTally).reduce(
                         (sum, v) => sum + v.length,
                         0
-                      )}{" "}
-                      / {alivePlayers.length} cast
+                      )}/{alivePlayers.length}
                     </span>
                   </div>
 
@@ -629,27 +596,18 @@ export default function GameViewer({
                               </div>
 
                               {/* Vote count */}
-                              <motion.div
-                                className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-black shrink-0"
+                              <div
+                                className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-bold shrink-0"
                                 style={{
-                                  background: `${targetColor}18`,
+                                  background: `${targetColor}12`,
                                   color: targetColor,
-                                  boxShadow: `0 0 8px ${targetColor}15`,
-                                }}
-                                animate={{
-                                  scale: [1, 1.05, 1],
-                                }}
-                                transition={{
-                                  duration: 1.5,
-                                  repeat: Infinity,
-                                  delay: idx * 0.2,
                                 }}
                               >
                                 {voters.length}
-                                <span className="text-[10px] font-medium opacity-70">
+                                <span className="text-[10px] font-normal opacity-60">
                                   vote{voters.length > 1 ? "s" : ""}
                                 </span>
-                              </motion.div>
+                              </div>
                             </div>
                           </motion.div>
                         );
@@ -662,38 +620,26 @@ export default function GameViewer({
 
           {/* ─── Discussion Feed ─── */}
           <div
-            className={cn(
-              "rounded-2xl overflow-hidden transition-all duration-700",
-              accent.glow
-            )}
-            style={{
-              background: "rgba(10,15,30,0.85)",
-              border: "1px solid rgba(148,163,184,0.08)",
-              backdropFilter: "blur(12px)",
-            }}
+            className="rounded-2xl overflow-hidden glass-card"
           >
             {/* Header */}
             <div
-              className="px-5 py-3.5 flex items-center justify-between"
+              className="px-5 py-3 flex items-center justify-between"
               style={{
-                borderBottom: "1px solid rgba(148,163,184,0.1)",
-                background: "rgba(15,23,42,0.6)",
+                borderBottom: "1px solid rgba(148,163,184,0.06)",
               }}
             >
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-2">
                 <div
-                  className="h-2 w-2 rounded-full"
-                  style={{
-                    backgroundColor: accent.accent,
-                    boxShadow: `0 0 8px ${accent.accent}50`,
-                  }}
+                  className="h-1.5 w-1.5 rounded-full"
+                  style={{ backgroundColor: accent.accent }}
                 />
-                <h3 className="text-sm font-bold text-gray-200">
-                  Discussion Feed
+                <h3 className="text-sm font-semibold text-gray-300">
+                  Discussion
                 </h3>
               </div>
-              <span className="text-[10px] text-gray-500 font-medium bg-gray-800/60 px-2.5 py-1 rounded-full">
-                {messages.length} messages
+              <span className="text-[10px] text-gray-600 font-mono">
+                {messages.length}
               </span>
             </div>
 
@@ -733,16 +679,8 @@ export default function GameViewer({
         {/* ─── Sidebar (right column) ─── */}
         <div className="space-y-5">
           {/* Game Info Card */}
-          <div
-            className={cn(
-              "rounded-2xl p-5 space-y-4 glass-card glass-card-hover card-shine transition-all duration-700",
-              accent.glow
-            )}
-          >
-            <h3
-              className="text-sm font-bold text-gray-300 flex items-center gap-2.5"
-              style={{ textShadow: `0 0 10px ${accent.accent}20` }}
-            >
+          <div className="rounded-2xl p-5 space-y-4 glass-card">
+            <h3 className="text-sm font-semibold text-gray-400 flex items-center gap-2">
               <Coins className="h-4 w-4" style={{ color: accent.accent }} />
               Game Info
             </h3>
@@ -760,19 +698,10 @@ export default function GameViewer({
                 </span>
               </div>
 
-              {/* Total Pot - highlighted */}
-              <div
-                className="flex justify-between items-center rounded-xl p-3"
-                style={{
-                  background:
-                    "linear-gradient(135deg, rgba(250,204,21,0.06), rgba(250,204,21,0.02))",
-                  border: "1px solid rgba(250,204,21,0.1)",
-                }}
-              >
-                <span className="text-xs text-gray-400 font-medium">
-                  Total Pot
-                </span>
-                <span className="text-base font-black text-yellow-400 tracking-tight">
+              {/* Total Pot */}
+              <div className="flex justify-between items-center rounded-lg p-3 bg-yellow-500/[0.04] border border-yellow-500/10">
+                <span className="text-xs text-gray-400">Total Pot</span>
+                <span className="text-base font-bold text-yellow-400 tabular-nums">
                   {formatMON(totalStake)}
                 </span>
               </div>
@@ -789,16 +718,8 @@ export default function GameViewer({
 
               {/* Round */}
               <div className="flex justify-between items-center">
-                <span className="text-xs text-gray-500 font-medium">
-                  Round
-                </span>
-                <span
-                  className="text-sm font-black"
-                  style={{
-                    color: accent.accent,
-                    textShadow: `0 0 8px ${accent.accent}40`,
-                  }}
-                >
+                <span className="text-xs text-gray-500">Round</span>
+                <span className="text-sm font-bold" style={{ color: accent.accent }}>
                   {currentRound}
                 </span>
               </div>
@@ -817,14 +738,9 @@ export default function GameViewer({
                     {players.length}
                   </span>
                   {/* Visual health bar */}
-                  <div className="w-12 h-1.5 bg-gray-800 rounded-full ml-1.5 overflow-hidden">
+                  <div className="w-12 h-1 bg-gray-800 rounded-full ml-1.5 overflow-hidden">
                     <motion.div
-                      className="h-full rounded-full"
-                      style={{
-                        background:
-                          "linear-gradient(90deg, #22c55e, #4ade80)",
-                        boxShadow: "0 0 6px rgba(34,197,94,0.4)",
-                      }}
+                      className="h-full rounded-full bg-green-500"
                       initial={{ width: "100%" }}
                       animate={{
                         width: `${players.length > 0 ? (alivePlayers.length / players.length) * 100 : 0}%`,
@@ -983,18 +899,10 @@ export default function GameViewer({
           </AnimatePresence>
 
           {/* All Players list */}
-          <div
-            className={cn(
-              "rounded-2xl p-5 glass-card glass-card-hover card-shine transition-all duration-700",
-              accent.glow
-            )}
-          >
-            <h3
-              className="text-sm font-bold text-gray-300 mb-4 flex items-center gap-2.5"
-              style={{ textShadow: `0 0 10px ${accent.accent}20` }}
-            >
+          <div className="rounded-2xl p-5 glass-card">
+            <h3 className="text-sm font-semibold text-gray-400 mb-4 flex items-center gap-2">
               <Users className="h-4 w-4" style={{ color: accent.accent }} />
-              All Players
+              Players
             </h3>
 
             <div className="space-y-1.5">

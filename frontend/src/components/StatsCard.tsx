@@ -103,40 +103,16 @@ export default function StatsCard({
         glowClass
       )}
     >
-      {/* Top shimmer line */}
-      <div
-        className="absolute top-0 left-0 right-0 h-[2px] animate-shimmer"
-        style={{
-          background: `linear-gradient(90deg, transparent, ${shimmerColor}, transparent)`,
-          backgroundSize: "200% 100%",
-        }}
-      />
-
-      {/* Subtle ambient glow */}
-      <div
-        className="absolute -top-8 -right-8 w-24 h-24 rounded-full blur-3xl opacity-20 group-hover:opacity-30 transition-opacity duration-700"
-        style={{
-          background: `radial-gradient(circle, ${shimmerColor}, transparent)`,
-        }}
-      />
-
       <div className="relative flex items-start gap-4">
-        {/* Animated icon container */}
-        <motion.div
-          animate={{ y: [0, -4, 0] }}
-          transition={{
-            duration: 3,
-            repeat: Infinity,
-            ease: "easeInOut",
-            delay: delay + 0.5,
-          }}
+        {/* Icon */}
+        <div
           className={cn(
-            "flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border transition-all duration-300 group-hover:scale-110",
+            "flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border",
             iconBgClass
           )}
         >
-          <Icon className={cn("h-5.5 w-5.5", color)} />
-        </motion.div>
+          <Icon className={cn("h-5 w-5", color)} />
+        </div>
 
         {/* Content */}
         <div className="flex flex-col min-w-0">
@@ -179,13 +155,6 @@ export default function StatsCard({
         </div>
       </div>
 
-      {/* Bottom accent gradient line */}
-      <div
-        className="absolute bottom-0 left-6 right-6 h-[1px] opacity-20 group-hover:opacity-40 transition-opacity duration-500"
-        style={{
-          background: `linear-gradient(90deg, transparent, ${shimmerColor}, transparent)`,
-        }}
-      />
     </motion.div>
   );
 }
