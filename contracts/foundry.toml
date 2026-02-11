@@ -1,0 +1,18 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+solc = "0.8.24"
+evm_version = "cancun"
+optimizer = true
+optimizer_runs = 200
+remappings = [
+    "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/"
+]
+
+[profile.default.fmt]
+line_length = 120
+
+# Monad mainnet
+[rpc_endpoints]
+monad = "https://rpc.monad.xyz"
