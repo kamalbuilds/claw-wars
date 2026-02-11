@@ -143,11 +143,11 @@ export default function PhaseTimer({
               <div className="flex items-center gap-3">
                 <span
                   className={cn(
-                    "text-lg font-bold tracking-tight",
+                    "font-pixel text-xs",
                     config.neonClass || getPhaseColor(phase)
                   )}
                 >
-                  {config.label}
+                  {config.label.toUpperCase()}
                 </span>
 
                 {/* Round pill */}

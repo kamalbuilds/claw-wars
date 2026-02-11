@@ -313,9 +313,8 @@ export default function GameViewer({
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.5 }}
                 className={cn(
-                  "text-5xl font-black mb-3 tracking-tight",
-                  winner === "lobsters" ? "neon-green" : "neon-purple",
-                  "animate-text-glow"
+                  "font-pixel text-2xl sm:text-3xl mb-3",
+                  winner === "lobsters" ? "neon-green" : "neon-purple"
                 )}
                 style={{
                   textShadow:
@@ -407,11 +406,11 @@ export default function GameViewer({
             )}
           >
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-gray-400 flex items-center gap-2">
+              <h3 className="font-pixel text-[10px] text-gray-400 flex items-center gap-2">
                 <Users className="h-4 w-4" style={{ color: accent.accent }} />
                 <span>
-                  Arena
-                  <span className="text-gray-600 font-normal ml-2 text-xs">
+                  ARENA
+                  <span className="text-gray-600 font-sans text-xs ml-2">
                     {alivePlayers.length}/{players.length}
                   </span>
                 </span>
@@ -419,7 +418,7 @@ export default function GameViewer({
               {phase && (
                 <div
                   className={cn(
-                    "text-[10px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-md",
+                    "font-pixel text-[8px] uppercase px-2.5 py-1 rounded-md",
                     phase === "discussion" && "text-green-400 bg-green-500/8",
                     phase === "voting" && "text-orange-400 bg-orange-500/8",
                     phase === "elimination" && "text-red-400 bg-red-500/8",
@@ -500,7 +499,7 @@ export default function GameViewer({
               >
                 <div className="rounded-2xl p-5 glass-card border-orange-500/10">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-sm font-semibold text-orange-400 flex items-center gap-2">
+                    <h3 className="font-pixel text-[10px] text-orange-400 flex items-center gap-2">
                       <svg
                         viewBox="0 0 24 24"
                         fill="none"
@@ -634,8 +633,8 @@ export default function GameViewer({
                   className="h-1.5 w-1.5 rounded-full"
                   style={{ backgroundColor: accent.accent }}
                 />
-                <h3 className="text-sm font-semibold text-gray-300">
-                  Discussion
+                <h3 className="font-pixel text-[10px] text-gray-300">
+                  DISCUSSION
                 </h3>
               </div>
               <span className="text-[10px] text-gray-600 font-mono">
@@ -680,9 +679,9 @@ export default function GameViewer({
         <div className="space-y-5">
           {/* Game Info Card */}
           <div className="rounded-2xl p-5 space-y-4 glass-card">
-            <h3 className="text-sm font-semibold text-gray-400 flex items-center gap-2">
+            <h3 className="font-pixel text-[10px] text-gray-400 flex items-center gap-2">
               <Coins className="h-4 w-4" style={{ color: accent.accent }} />
-              Game Info
+              GAME INFO
             </h3>
 
             <div className="space-y-3">
@@ -900,9 +899,9 @@ export default function GameViewer({
 
           {/* All Players list */}
           <div className="rounded-2xl p-5 glass-card">
-            <h3 className="text-sm font-semibold text-gray-400 mb-4 flex items-center gap-2">
+            <h3 className="font-pixel text-[10px] text-gray-400 mb-4 flex items-center gap-2">
               <Users className="h-4 w-4" style={{ color: accent.accent }} />
-              Players
+              PLAYERS
             </h3>
 
             <div className="space-y-1.5">

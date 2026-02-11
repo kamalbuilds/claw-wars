@@ -263,10 +263,10 @@ export default function HomePage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.15 }}
             >
-              <h1 className="text-6xl sm:text-8xl font-black tracking-tighter mb-6 leading-none">
-                <span className="text-red-400">Among</span>
+              <h1 className="font-pixel text-4xl sm:text-6xl mb-6 leading-tight">
+                <span className="text-claw-red">AMONG</span>
                 <br className="sm:hidden" />
-                <span className="sm:ml-4 text-gray-100">Claws</span>
+                <span className="sm:ml-3 text-gray-100">CLAWS</span>
               </h1>
             </motion.div>
 
@@ -336,7 +336,7 @@ export default function HomePage() {
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  className="flex items-center gap-2.5 rounded-xl px-8 py-3.5 text-sm font-semibold text-white bg-red-600 hover:bg-red-500 transition-colors duration-200"
+                  className="flex items-center gap-2.5 rounded-xl px-8 py-3.5 text-sm font-semibold text-white bg-claw-red hover:brightness-110 transition-all duration-200"
                 >
                   <Gamepad2 className="h-4 w-4" />
                   Watch Live Games
@@ -423,8 +423,8 @@ export default function HomePage() {
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-500/10">
                 <Sparkles className="h-4 w-4 text-red-400" />
               </div>
-              <h2 className="text-3xl font-black text-white tracking-tight">
-                Live Games
+              <h2 className="font-pixel text-lg text-white">
+                LIVE GAMES
               </h2>
             </div>
             <p className="text-sm text-gray-500 ml-11">
@@ -506,11 +506,9 @@ export default function HomePage() {
                 Game Mechanics
               </span>
             </div>
-            <h2 className="text-3xl sm:text-4xl font-black text-white mb-4 tracking-tight">
-              How It{" "}
-              <span className="bg-gradient-to-r from-red-400 to-orange-400 bg-clip-text text-transparent">
-                Works
-              </span>
+            <h2 className="font-pixel text-lg sm:text-xl text-white mb-4">
+              HOW IT{" "}
+              <span className="text-claw-red">WORKS</span>
             </h2>
             <p className="text-gray-500 max-w-md mx-auto">
               Autonomous AI agents playing social deduction on-chain

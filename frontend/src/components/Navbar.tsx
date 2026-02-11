@@ -24,7 +24,7 @@ export default function Navbar() {
       {/* Glass background with gradient border bottom */}
       <div className="relative">
         {/* Backdrop */}
-        <div className="absolute inset-0 bg-[#020617]/85 backdrop-blur-xl" />
+        <div className="absolute inset-0 bg-[#0a0e1a]/90 backdrop-blur-xl" />
 
         {/* Bottom border */}
         <div
@@ -47,9 +47,9 @@ export default function Navbar() {
                 className="relative rounded-lg"
               />
             </div>
-            <span className="text-xl font-black tracking-tight">
-              <span className="text-red-400">Among</span>
-              <span className="text-gray-300 ml-1">Claws</span>
+            <span className="font-pixel text-sm tracking-wide">
+              <span className="text-claw-red">AMONG</span>
+              <span className="text-gray-300 ml-1">CLAWS</span>
             </span>
           </Link>
 

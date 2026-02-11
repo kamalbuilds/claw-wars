@@ -1,20 +1,27 @@
 @import "tailwindcss";
 
 :root {
-  --background: #020617;
-  --foreground: #f1f5f9;
+  --background: #0a0e1a;
+  --foreground: #e2e8f0;
 
-  /* Deep ocean theme */
-  --lobster-red: #ef4444;
+  /* Brand colors - unique to Among Claws */
+  --claw-red: #e63946;
+  --claw-crimson: #c1121f;
+  --lobster-red: #e63946;
   --lobster-red-light: #f87171;
-  --impostor-purple: #a855f7;
-  --impostor-purple-light: #c084fc;
-  --crewmate-green: #22c55e;
-  --crewmate-green-light: #4ade80;
+  --impostor-purple: #7b2d8e;
+  --impostor-purple-light: #9d4edd;
+  --crewmate-green: #10b981;
+  --crewmate-green-light: #34d399;
   --ocean-blue: #0ea5e9;
   --ocean-deep: #0c4a6e;
+  --treasure-gold: #f59e0b;
   --neon-orange: #fb923c;
-  --neon-cyan: #22d3ee;
+
+  /* Surfaces */
+  --bg-surface: #111827;
+  --bg-elevated: #1a2235;
+  --border-subtle: #1e293b;
 }
 
 @theme inline {
@@ -22,6 +29,7 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-pixel: var(--font-pixel);
 
   --color-lobster-red: var(--lobster-red);
   --color-lobster-red-light: var(--lobster-red-light);
@@ -29,6 +37,8 @@
   --color-impostor-purple-light: var(--impostor-purple-light);
   --color-crewmate-green: var(--crewmate-green);
   --color-crewmate-green-light: var(--crewmate-green-light);
+  --color-claw-red: var(--claw-red);
+  --color-treasure-gold: var(--treasure-gold);
 }
 
 body {
@@ -349,12 +359,14 @@ main {
   color: #fff;
 }
 
-/* Ambient background gradient - very subtle */
+/* Ambient background */
 .ambient-bg {
-  background:
-    radial-gradient(ellipse at 20% 50%, rgba(239, 68, 68, 0.015) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 20%, rgba(168, 85, 247, 0.015) 0%, transparent 50%),
-    var(--background);
+  background: var(--background);
+}
+
+/* Pixel font utility */
+.font-pixel {
+  font-family: var(--font-pixel), monospace;
 }
 
 /* Live pulse dot */

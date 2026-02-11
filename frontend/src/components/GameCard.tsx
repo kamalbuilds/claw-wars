@@ -225,7 +225,7 @@ export default function GameCard({ game, index }: GameCardProps) {
             <div className="mb-5">
               <motion.div
                 className={cn(
-                  "inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-semibold backdrop-blur-sm",
+                  "inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 font-pixel text-[8px] backdrop-blur-sm",
                   getPhaseBgColor(game.phase)
                 )}
                 animate={
