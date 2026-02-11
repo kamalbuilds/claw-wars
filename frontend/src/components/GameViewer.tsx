@@ -133,11 +133,15 @@ export default function GameViewer({
   winner,
 }: GameViewerProps) {
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
   const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
 
-  // Auto-scroll chat
+  // Auto-scroll chat within its container only (not the page)
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const container = chatContainerRef.current;
+    if (container) {
+      container.scrollTop = container.scrollHeight;
+    }
   }, [messages]);
 
   const alivePlayers = players.filter((p) => p.isAlive);
@@ -694,7 +698,7 @@ export default function GameViewer({
             </div>
 
             {/* Messages area */}
-            <div className="h-[400px] overflow-y-auto p-3 space-y-1 scroll-smooth" style={{ background: "rgba(8,12,24,0.5)" }}>
+            <div ref={chatContainerRef} className="h-[400px] overflow-y-auto p-3 space-y-1 scroll-smooth" style={{ background: "rgba(8,12,24,0.5)" }}>
               {messages.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full gap-3">
                   <motion.div

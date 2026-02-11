@@ -172,7 +172,7 @@ export default function GamePage({
               players={
                 players.length > 0 ? players : getDemoGameState(gameId).players
               }
-              timeRemaining={timeRemaining || 42}
+              timeRemaining={timeRemaining}
               connected={connected}
               error={error}
               winner={winner}
