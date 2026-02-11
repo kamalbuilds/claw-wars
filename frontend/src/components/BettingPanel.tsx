@@ -93,14 +93,17 @@ export default function BettingPanel({
           ? odds?.specificAgents?.[targetAgent] ?? 5.0
           : 5.0;
 
-  const potentialPayout = amount
-    ? (parseFloat(amount) * currentOdds).toFixed(2)
+  const parsedAmount = parseFloat(amount);
+  const potentialPayout = amount && !isNaN(parsedAmount)
+    ? (parsedAmount * currentOdds).toFixed(2)
     : "0.00";
 
   const isDisabled =
     isPlacing ||
+    !isConnected ||
     !amount ||
-    parseFloat(amount) <= 0 ||
+    isNaN(parsedAmount) ||
+    parsedAmount <= 0 ||
     (betType === "specific_agent" && !targetAgent);
 
   async function handlePlaceBet() {

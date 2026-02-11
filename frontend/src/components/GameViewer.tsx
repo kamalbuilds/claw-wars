@@ -437,7 +437,6 @@ export default function GameViewer({
                 players={players}
                 phase={phase}
                 winner={winner}
-                accentColor={accent.accent}
               />
             </div>
 

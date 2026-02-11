@@ -188,7 +188,6 @@ function ParticleLayer({
       for (const p of particles) {
         const lifeRatio = p.life / p.maxLife;
         if (p.type === "confetti") {
-          const rot = time * 3 + p.x;
           const hw = p.size * 0.6;
           const hh = p.size;
           g.rect(p.x - hw, p.y - hh, hw * 2, hh * 2);
@@ -233,18 +232,23 @@ function ArenaScene({
   const prevAliveRef = useRef<Record<string, boolean>>({});
   const confettiSpawnRef = useRef(0);
 
-  // Initialize crab states
+  // Initialize crab states - preserve existing by player address
+  const crabStatesMap = useRef<Record<string, CrabState>>({});
   const crabStates = useRef<CrabState[]>([]);
-  if (crabStates.current.length !== players.length) {
-    crabStates.current = players.map((_, i) => ({
-      bobOffset: 0,
-      clawAngle: 0,
-      facingAngle: 0,
-      targetFacing: 0,
-      scale: 1,
-      glowIntensity: 0,
-    }));
-  }
+  const defaultCrab = (): CrabState => ({
+    bobOffset: 0,
+    clawAngle: 0,
+    facingAngle: 0,
+    targetFacing: 0,
+    scale: 1,
+    glowIntensity: 0,
+  });
+  crabStates.current = players.map((p) => {
+    if (!crabStatesMap.current[p.address]) {
+      crabStatesMap.current[p.address] = defaultCrab();
+    }
+    return crabStatesMap.current[p.address];
+  });
 
   // Trigger elimination explosion
   const triggerExplosion = useCallback(
@@ -455,7 +459,6 @@ interface PixiArenaProps {
   players: Player[];
   phase: GamePhase | null;
   winner: "lobsters" | "impostor" | null;
-  accentColor: string;
 }
 
 export default function PixiArena({ players, phase, winner }: PixiArenaProps) {

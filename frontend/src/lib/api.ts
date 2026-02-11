@@ -81,9 +81,9 @@ function toGameState(raw: any): GameState {
     players: (raw.players ?? []).map((p: Record<string, unknown>) => ({
       address: p.address ?? "",
       name: (p.name as string) ?? "",
-      role: p.role ?? "unknown",
+      role: ["lobster", "impostor", "unknown"].includes(p.role as string) ? p.role : "unknown",
       isAlive: p.isAlive ?? p.alive ?? true,
-      votedFor: (p.votedFor as string) ?? null,
+      votedFor: p.votedFor || null,
       isSpeaking: p.isSpeaking ?? false,
     })),
     messages: (raw.messages ?? []).map((m: Record<string, unknown>) => ({

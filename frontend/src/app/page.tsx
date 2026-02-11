@@ -31,7 +31,7 @@ function AnimatedCounter({ value, suffix = "" }: { value: number; suffix?: strin
   const isInView = useInView(ref, { once: true });
 
   useEffect(() => {
-    if (!isInView) return;
+    if (!isInView || value <= 0) return;
     const duration = 1500;
     const steps = 40;
     const stepValue = value / steps;
@@ -146,7 +146,7 @@ export default function HomePage() {
   const completedGames = games.filter((g) => g.phase === "results");
 
   const totalWagered = games.reduce(
-    (acc, g) => acc + parseFloat(g.totalStake),
+    (acc, g) => acc + (parseFloat(g.totalStake) || 0),
     0
   );
 
