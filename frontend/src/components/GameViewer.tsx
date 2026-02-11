@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn, formatMON, shortenAddress, getAgentColor } from "@/lib/utils";
 import {
@@ -17,6 +18,15 @@ import PlayerAvatar from "./PlayerAvatar";
 import PhaseTimer from "./PhaseTimer";
 import DiscussionMessage from "./DiscussionMessage";
 import type { GameState, Player, ChatMessage, GamePhase } from "@/lib/types";
+
+const PixiArena = dynamic(() => import("./game/PixiArena"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-[350px]">
+      <div className="animate-pulse text-gray-600 text-sm">Loading arena...</div>
+    </div>
+  ),
+});
 
 interface GameViewerProps {
   gameState: GameState | null;
@@ -440,88 +450,15 @@ export default function GameViewer({
               )}
             </div>
 
-            {/* Alive players - centered arena layout */}
-            <div className="flex flex-wrap justify-center gap-6 mb-5 min-h-[120px] items-center py-2">
-              <AnimatePresence mode="popLayout">
-                {alivePlayers.map((player, idx) => (
-                  <motion.div
-                    key={player.address}
-                    layout
-                    initial={{ opacity: 0, scale: 0.5, y: 20 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0, y: -20, filter: "blur(8px)" }}
-                    transition={{
-                      type: "spring",
-                      damping: 20,
-                      stiffness: 300,
-                      delay: idx * 0.05,
-                    }}
-                  >
-                    <PlayerAvatar
-                      player={player}
-                      size="lg"
-                      showVote={phase === "voting"}
-                      onClick={() =>
-                        setSelectedPlayer(
-                          selectedPlayer === player.address
-                            ? null
-                            : player.address
-                        )
-                      }
-                    />
-                  </motion.div>
-                ))}
-              </AnimatePresence>
+            {/* PixiJS 2D Game Arena */}
+            <div className="rounded-xl overflow-hidden mb-3">
+              <PixiArena
+                players={players}
+                phase={phase}
+                winner={winner}
+                accentColor={accent.accent}
+              />
             </div>
-
-            {/* Vote connections visualization */}
-            <AnimatePresence>
-              {phase === "voting" && Object.keys(voteTally).length > 0 && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="overflow-hidden"
-                >
-                  <div className="flex flex-wrap justify-center gap-2 mb-4">
-                    {alivePlayers
-                      .filter((p) => p.votedFor)
-                      .map((voter) => {
-                        const targetPlayer = players.find(
-                          (p) => p.address === voter.votedFor
-                        );
-                        return (
-                          <motion.div
-                            key={`vote-line-${voter.address}`}
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            className="flex items-center gap-1.5 text-[10px] bg-orange-500/8 border border-orange-500/20 rounded-full px-2.5 py-1"
-                          >
-                            <span
-                              className="font-bold"
-                              style={{ color: getAgentColor(voter.address) }}
-                            >
-                              {voter.name || voter.address.slice(2, 6)}
-                            </span>
-                            <ArrowRight className="h-2.5 w-2.5 text-orange-400" />
-                            <span
-                              className="font-bold"
-                              style={{
-                                color: targetPlayer
-                                  ? getAgentColor(targetPlayer.address)
-                                  : "#fb923c",
-                              }}
-                            >
-                              {targetPlayer?.name ||
-                                shortenAddress(voter.votedFor || "")}
-                            </span>
-                          </motion.div>
-                        );
-                      })}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
 
             {/* Eliminated section - gravestone style */}
             <AnimatePresence>
