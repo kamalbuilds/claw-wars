@@ -23,11 +23,15 @@ function getApiBase(endpoint: string): string {
 }
 
 async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> {
+  const { headers: extraHeaders, ...rest } = options ?? {};
   const res = await fetch(getApiBase(endpoint), {
     headers: {
       "Content-Type": "application/json",
+      ...(extraHeaders instanceof Headers
+        ? Object.fromEntries(extraHeaders.entries())
+        : extraHeaders ?? {}),
     },
-    ...options,
+    ...rest,
   });
   if (!res.ok) {
     throw new Error(`API error: ${res.status} ${res.statusText}`);
@@ -130,23 +134,5 @@ export async function getGameOdds(gameId: string): Promise<BettingOdds> {
   return fetchAPI<BettingOdds>(`/api/games/${gameId}/odds`);
 }
 
-export async function placeBet(
-  gameId: string,
-  betType: "lobsters_win" | "impostor_wins" | "specific_agent",
-  amount: string,
-  targetAgent?: string
-): Promise<Bet> {
-  return fetchAPI<Bet>("/api/bets", {
-    method: "POST",
-    body: JSON.stringify({
-      gameId,
-      betType,
-      amount,
-      targetAgent,
-    }),
-  });
-}
-
-export async function getMyBets(address: string): Promise<Bet[]> {
-  return fetchAPI<Bet[]>(`/api/bets?bettor=${address}`);
-}
+// Betting is handled on-chain via the AmongClawsBetting smart contract.
+// See src/lib/contracts.ts for the contract ABI and helpers.

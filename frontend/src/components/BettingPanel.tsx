@@ -2,12 +2,18 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useAccount } from "wagmi";
+import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { cn, shortenAddress, formatMON } from "@/lib/utils";
-import { Coins, TrendingUp, Target, ChevronDown } from "lucide-react";
+import { cn, shortenAddress } from "@/lib/utils";
+import { Coins, TrendingUp, Target, ChevronDown, CheckCircle, XCircle } from "lucide-react";
 import type { Player, BettingOdds, Bet } from "@/lib/types";
-import { placeBet } from "@/lib/api";
+import {
+  BETTING_CONTRACT,
+  BETTING_ABI,
+  BET_TYPE_MAP,
+  gameIdToUint256,
+  monToWei,
+} from "@/lib/contracts";
 
 interface BettingPanelProps {
   gameId: string;
@@ -66,8 +72,17 @@ export default function BettingPanel({
   const [betType, setBetType] = useState<BetType>("lobsters_win");
   const [amount, setAmount] = useState("");
   const [targetAgent, setTargetAgent] = useState("");
-  const [isPlacing, setIsPlacing] = useState(false);
   const [showAgentSelect, setShowAgentSelect] = useState(false);
+  const [betError, setBetError] = useState<string | null>(null);
+  const [betSuccess, setBetSuccess] = useState(false);
+
+  // On-chain bet transaction
+  const { writeContract, data: txHash, isPending: isWriting, error: writeError } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+    hash: txHash,
+  });
+
+  const isPlacing = isWriting || isConfirming;
 
   const currentOdds =
     betType === "lobsters_win"
@@ -89,25 +104,50 @@ export default function BettingPanel({
     (betType === "specific_agent" && !targetAgent);
 
   async function handlePlaceBet() {
-    if (isDisabled) return;
+    if (isDisabled || !address) return;
 
-    setIsPlacing(true);
+    setBetError(null);
+    setBetSuccess(false);
+
     try {
-      await placeBet(gameId, betType, amount, targetAgent || undefined);
-      setAmount("");
+      const numericGameId = gameIdToUint256(gameId);
+      const betTypeNum = BET_TYPE_MAP[betType];
+      const predictedAgent = betType === "specific_agent" && targetAgent
+        ? targetAgent as `0x${string}`
+        : "0x0000000000000000000000000000000000000000" as `0x${string}`;
+      const value = monToWei(amount);
+
+      if (value <= BigInt(0)) {
+        setBetError("Invalid amount");
+        return;
+      }
+
+      writeContract({
+        address: BETTING_CONTRACT,
+        abi: BETTING_ABI,
+        functionName: "placeBet",
+        args: [numericGameId, betTypeNum, predictedAgent],
+        value,
+      });
     } catch (error) {
-      console.error("Failed to place bet:", error);
-    } finally {
-      setIsPlacing(false);
+      setBetError(error instanceof Error ? error.message : "Failed to place bet");
     }
   }
+
+  // Show success after confirmation
+  if (isConfirmed && !betSuccess) {
+    setBetSuccess(true);
+    setAmount("");
+    setTimeout(() => setBetSuccess(false), 4000);
+  }
+
+  const displayError = betError || (writeError ? writeError.message.split("\n")[0] : null);
 
   return (
     <div className="gradient-border overflow-hidden">
       <div className="glass-card card-shine rounded-2xl overflow-hidden">
         {/* Header */}
         <div className="relative border-b border-white/[0.06] p-5">
-          {/* Subtle gold glow behind coins icon */}
           <div className="absolute top-4 left-4 h-8 w-8 rounded-full bg-yellow-500/10 blur-xl" />
           <div className="relative flex items-center gap-3">
             <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-yellow-500/[0.08] border border-yellow-500/20">
@@ -161,6 +201,7 @@ export default function BettingPanel({
                         whileTap={{ scale: 0.99 }}
                         onClick={() => {
                           setBetType(option.type);
+                          setBetError(null);
                           if (option.type !== "specific_agent") {
                             setTargetAgent("");
                             setShowAgentSelect(false);
@@ -182,7 +223,6 @@ export default function BettingPanel({
                               ]
                         )}
                       >
-                        {/* Active glow backdrop */}
                         {isActive && (
                           <div className="absolute inset-0 opacity-20 pointer-events-none">
                             <div
@@ -198,9 +238,7 @@ export default function BettingPanel({
                         <div
                           className={cn(
                             "flex h-8 w-8 items-center justify-center rounded-lg",
-                            isActive
-                              ? "bg-white/[0.08]"
-                              : "bg-white/[0.03]"
+                            isActive ? "bg-white/[0.08]" : "bg-white/[0.03]"
                           )}
                         >
                           <Icon
@@ -210,10 +248,7 @@ export default function BettingPanel({
                             )}
                           />
                         </div>
-                        <span className={cn(
-                          "relative",
-                          isActive && option.activeNeonClass
-                        )}>
+                        <span className={cn("relative", isActive && option.activeNeonClass)}>
                           {option.label}
                         </span>
                         <span
@@ -313,10 +348,7 @@ export default function BettingPanel({
                                       {player.name || shortenAddress(player.address)}
                                     </span>
                                     <span className="text-xs font-mono text-orange-400/70">
-                                      {(
-                                        odds?.specificAgents?.[player.address] ?? 5.0
-                                      ).toFixed(1)}
-                                      x
+                                      {(odds?.specificAgents?.[player.address] ?? 5.0).toFixed(1)}x
                                     </span>
                                   </button>
                                 ))}
@@ -346,7 +378,10 @@ export default function BettingPanel({
                     step="0.01"
                     placeholder="0.00"
                     value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
+                    onChange={(e) => {
+                      setAmount(e.target.value);
+                      setBetError(null);
+                    }}
                     className={cn(
                       "w-full rounded-xl border px-4 py-3.5 pr-14 text-white text-base font-mono",
                       "placeholder-gray-600 transition-all duration-300",
@@ -367,7 +402,10 @@ export default function BettingPanel({
                       key={val}
                       whileHover={{ scale: 1.04, y: -1 }}
                       whileTap={{ scale: 0.97 }}
-                      onClick={() => setAmount(val)}
+                      onClick={() => {
+                        setAmount(val);
+                        setBetError(null);
+                      }}
                       className={cn(
                         "flex-1 rounded-lg border py-2 text-xs font-semibold",
                         "transition-all duration-200",
@@ -388,9 +426,7 @@ export default function BettingPanel({
                   <span className="text-[11px] text-gray-500 uppercase tracking-wider font-medium">
                     Odds
                   </span>
-                  <span
-                    className="text-sm font-mono font-bold tabular-nums neon-orange"
-                  >
+                  <span className="text-sm font-mono font-bold tabular-nums neon-orange">
                     {currentOdds.toFixed(2)}x
                   </span>
                 </div>
@@ -404,6 +440,32 @@ export default function BettingPanel({
                   </span>
                 </div>
               </div>
+
+              {/* Error / Success messages */}
+              <AnimatePresence>
+                {displayError && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="flex items-start gap-2 rounded-xl bg-red-500/[0.08] border border-red-500/20 p-3"
+                  >
+                    <XCircle className="h-4 w-4 text-red-400 mt-0.5 shrink-0" />
+                    <p className="text-xs text-red-300 leading-relaxed">{displayError}</p>
+                  </motion.div>
+                )}
+                {betSuccess && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="flex items-center gap-2 rounded-xl bg-green-500/[0.08] border border-green-500/20 p-3"
+                  >
+                    <CheckCircle className="h-4 w-4 text-green-400 shrink-0" />
+                    <p className="text-xs text-green-300">Bet placed on-chain successfully!</p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* Place Bet Button */}
               <motion.button
@@ -424,21 +486,27 @@ export default function BettingPanel({
                       ]
                 )}
               >
-                {/* Shimmer overlay */}
                 {!isDisabled && (
-                  <div
-                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.08] to-transparent animate-shimmer bg-[length:200%_100%] pointer-events-none"
-                  />
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.08] to-transparent animate-shimmer bg-[length:200%_100%] pointer-events-none" />
                 )}
                 <span className="relative">
-                  {isPlacing ? (
+                  {isWriting ? (
                     <span className="inline-flex items-center gap-2">
                       <motion.span
                         animate={{ rotate: 360 }}
                         transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                         className="inline-block h-4 w-4 border-2 border-white/30 border-t-white rounded-full"
                       />
-                      Placing Bet...
+                      Confirm in wallet...
+                    </span>
+                  ) : isConfirming ? (
+                    <span className="inline-flex items-center gap-2">
+                      <motion.span
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        className="inline-block h-4 w-4 border-2 border-white/30 border-t-white rounded-full"
+                      />
+                      Confirming tx...
                     </span>
                   ) : (
                     "Place Bet"
@@ -477,7 +545,7 @@ export default function BettingPanel({
                       </span>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-[10px] text-gray-500 font-mono">
-                          {formatMON(bet.amount)}
+                          {bet.amount} MON
                         </span>
                         <span className="text-[10px] text-gray-600">@</span>
                         <span className="text-[10px] text-orange-400/70 font-mono">
