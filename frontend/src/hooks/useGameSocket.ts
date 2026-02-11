@@ -63,6 +63,39 @@ function normalizePlayers(raw: unknown[]): Player[] {
   }));
 }
 
+function normalizeMessage(m: any): ChatMessage {
+  return {
+    id: m.id ?? String(m.timestamp ?? Math.random()),
+    sender: m.sender ?? "",
+    senderName: m.senderName ?? m.sender_name ?? "",
+    content: m.content ?? "",
+    timestamp: m.timestamp ?? Date.now(),
+    type: m.type ?? "discussion",
+    senderAlive: m.senderAlive ?? m.sender_alive ?? true,
+  };
+}
+
+function normalizeMessages(raw: unknown): ChatMessage[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map(normalizeMessage);
+}
+
+function normalizeGameState(data: any, fallbackId: string): GameState {
+  return {
+    id: data.gameId ?? data.id ?? fallbackId,
+    phase: normalizePhase(data.phase),
+    round: data.roundNumber ?? data.round ?? 1,
+    players: normalizePlayers(data.players ?? []),
+    messages: normalizeMessages(data.messages),
+    timeRemaining: data.timeRemaining ?? 0,
+    totalStake: data.totalStake ?? "0",
+    stakePerPlayer: data.stakePerPlayer ?? "0",
+    maxPlayers: data.maxPlayers ?? 8,
+    createdAt: data.createdAt ?? Date.now(),
+    winner: data.winner ?? null,
+  };
+}
+
 export function useGameSocket(gameId: string | null): UseGameSocketReturn {
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -79,6 +112,15 @@ export function useGameSocket(gameId: string | null): UseGameSocketReturn {
   const timerInterval = useRef<NodeJS.Timeout | null>(null);
   const pollInterval = useRef<NodeJS.Timeout | null>(null);
   const wsFailedRef = useRef(false);
+  const serverTimeRef = useRef(0); // Track server-sent time to avoid jitter
+
+  // Set server time from external updates (WS or polling) without triggering timer jitter
+  const updateServerTime = useCallback((newTime: number) => {
+    if (Math.abs(newTime - serverTimeRef.current) > 1) {
+      serverTimeRef.current = newTime;
+      setTimeRemaining(newTime);
+    }
+  }, []);
 
   // HTTP polling fallback when WebSocket fails
   const startPolling = useCallback(() => {
@@ -90,27 +132,14 @@ export function useGameSocket(gameId: string | null): UseGameSocketReturn {
         if (!res.ok) return;
         const data = await res.json();
 
-        const normalizedPhase = normalizePhase(data.phase);
-        const normalizedPlayers = normalizePlayers(data.players ?? []);
+        const normalized = normalizeGameState(data, gameId);
 
-        setGameState({
-          id: data.gameId ?? data.id ?? gameId,
-          phase: normalizedPhase,
-          round: data.roundNumber ?? data.round ?? 1,
-          players: normalizedPlayers,
-          messages: data.messages ?? [],
-          timeRemaining: data.timeRemaining ?? 0,
-          totalStake: data.totalStake ?? "0",
-          stakePerPlayer: data.stakePerPlayer ?? "0",
-          maxPlayers: data.maxPlayers ?? 8,
-          createdAt: data.createdAt ?? Date.now(),
-          winner: data.winner ?? null,
-        });
-        setPhase(normalizedPhase);
-        setPlayers(normalizedPlayers);
-        setTimeRemaining(data.timeRemaining ?? 0);
-        if (data.messages) setMessages(data.messages);
-        if (data.winner) setWinner(data.winner);
+        setGameState(normalized);
+        setPhase(normalized.phase);
+        setPlayers(normalized.players);
+        updateServerTime(normalized.timeRemaining);
+        setMessages(normalized.messages);
+        if (normalized.winner) setWinner(normalized.winner);
         setConnected(true);
         setError(null);
       } catch {
@@ -120,7 +149,7 @@ export function useGameSocket(gameId: string | null): UseGameSocketReturn {
 
     poll(); // Immediate first poll
     pollInterval.current = setInterval(poll, POLL_INTERVAL);
-  }, [gameId]);
+  }, [gameId, updateServerTime]);
 
   const stopPolling = useCallback(() => {
     if (pollInterval.current) {
@@ -152,22 +181,24 @@ export function useGameSocket(gameId: string | null): UseGameSocketReturn {
           const wsEvent = JSON.parse(event.data) as WebSocketEvent;
 
           switch (wsEvent.type) {
-            case "game_state":
-              setGameState(wsEvent.data);
-              setPlayers(normalizePlayers(wsEvent.data.players));
-              setPhase(normalizePhase(wsEvent.data.phase));
-              setTimeRemaining(wsEvent.data.timeRemaining);
-              setMessages(wsEvent.data.messages);
-              setWinner(wsEvent.data.winner);
+            case "game_state": {
+              const normalized = normalizeGameState(wsEvent.data, gameId ?? "unknown");
+              setGameState(normalized);
+              setPlayers(normalized.players);
+              setPhase(normalized.phase);
+              updateServerTime(normalized.timeRemaining);
+              setMessages(normalized.messages);
+              setWinner(normalized.winner);
               break;
+            }
 
             case "phase_change":
               setPhase(normalizePhase(wsEvent.data.phase));
-              setTimeRemaining(wsEvent.data.timeRemaining);
+              updateServerTime(wsEvent.data.timeRemaining ?? 0);
               break;
 
             case "message":
-              setMessages((prev) => [...prev, wsEvent.data]);
+              setMessages((prev) => [...prev, normalizeMessage(wsEvent.data)]);
               break;
 
             case "vote":
@@ -244,26 +275,32 @@ export function useGameSocket(gameId: string | null): UseGameSocketReturn {
       wsFailedRef.current = true;
       startPolling();
     }
-  }, [gameId, startPolling, stopPolling]);
+  }, [gameId, startPolling, stopPolling, updateServerTime]);
 
-  // Countdown timer
+  // Countdown timer - only depends on phase, not timeRemaining
   useEffect(() => {
     if (timerInterval.current) {
       clearInterval(timerInterval.current);
+      timerInterval.current = null;
     }
 
-    if (timeRemaining > 0 && phase && phase !== "results") {
+    if (phase && phase !== "results" && phase !== "lobby") {
       timerInterval.current = setInterval(() => {
-        setTimeRemaining((prev) => Math.max(0, prev - 1));
+        setTimeRemaining((prev) => {
+          const next = Math.max(0, prev - 1);
+          serverTimeRef.current = next;
+          return next;
+        });
       }, 1000);
     }
 
     return () => {
       if (timerInterval.current) {
         clearInterval(timerInterval.current);
+        timerInterval.current = null;
       }
     };
-  }, [timeRemaining, phase]);
+  }, [phase]);
 
   // Connect / disconnect
   useEffect(() => {
