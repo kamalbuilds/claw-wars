@@ -659,16 +659,21 @@ export default function GameViewer({
           {/* ─── Discussion Feed ─── */}
           <div
             className={cn(
-              "rounded-2xl overflow-hidden glass-card card-shine transition-all duration-700",
+              "rounded-2xl overflow-hidden transition-all duration-700",
               accent.glow
             )}
+            style={{
+              background: "rgba(10,15,30,0.85)",
+              border: "1px solid rgba(148,163,184,0.08)",
+              backdropFilter: "blur(12px)",
+            }}
           >
             {/* Header */}
             <div
               className="px-5 py-3.5 flex items-center justify-between"
               style={{
-                borderBottom: "1px solid rgba(148,163,184,0.06)",
-                background: "rgba(15,23,42,0.4)",
+                borderBottom: "1px solid rgba(148,163,184,0.1)",
+                background: "rgba(15,23,42,0.6)",
               }}
             >
               <div className="flex items-center gap-2.5">
@@ -679,17 +684,17 @@ export default function GameViewer({
                     boxShadow: `0 0 8px ${accent.accent}50`,
                   }}
                 />
-                <h3 className="text-sm font-bold text-gray-300">
+                <h3 className="text-sm font-bold text-gray-200">
                   Discussion Feed
                 </h3>
               </div>
-              <span className="text-[10px] text-gray-600 font-medium bg-gray-800/40 px-2.5 py-1 rounded-full">
+              <span className="text-[10px] text-gray-500 font-medium bg-gray-800/60 px-2.5 py-1 rounded-full">
                 {messages.length} messages
               </span>
             </div>
 
             {/* Messages area */}
-            <div className="h-[400px] overflow-y-auto p-3 space-y-1 scroll-smooth">
+            <div className="h-[400px] overflow-y-auto p-3 space-y-1 scroll-smooth" style={{ background: "rgba(8,12,24,0.5)" }}>
               {messages.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full gap-3">
                   <motion.div

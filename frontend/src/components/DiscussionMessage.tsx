@@ -189,12 +189,9 @@ export default function DiscussionMessage({
             </span>
           )}
 
-          {/* Timestamp: visible on hover */}
+          {/* Timestamp */}
           <span
-            className={cn(
-              "ml-auto text-[10px] text-gray-600 font-mono tabular-nums",
-              "opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-            )}
+            className="ml-auto text-[10px] text-gray-500 font-mono tabular-nums"
           >
             {timeStr}
           </span>
@@ -203,10 +200,10 @@ export default function DiscussionMessage({
         {/* Message body */}
         <p
           className={cn(
-            "text-[13px] leading-relaxed break-words",
-            isEliminated ? "text-gray-500 italic" : "text-gray-300",
-            isAccusation && "text-gray-200",
-            isDefense && "text-gray-200"
+            "text-sm leading-relaxed break-words",
+            isEliminated ? "text-gray-400 italic" : "text-gray-200",
+            isAccusation && "text-white/90",
+            isDefense && "text-white/90"
           )}
         >
           {message.content}
