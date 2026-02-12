@@ -1,4 +1,4 @@
-import { encodeFunctionData, parseEther, type Hex } from "viem";
+import { encodeFunctionData, parseEther, keccak256, toHex, type Hex } from "viem";
 import { publicClient, walletClient, monad } from "./client.js";
 import { logger } from "../utils/logger.js";
 import { config } from "../config.js";
@@ -7,11 +7,11 @@ const nadfunLogger = logger.child("NadFun");
 
 const isTestnet = config.monad.chainId === 10143;
 
-// Nad.fun contract addresses (testnet vs mainnet)
+// Nad.fun contract addresses (testnet vs mainnet) — from official SDK
 const NADFUN_CONTRACTS = isTestnet
   ? {
       CORE: "0x865054F0F6A288adaAc30261731361EA7E908003" as const, // BondingCurveRouter
-      BONDING_CURVE: "0x1228b0dc9481C11D3071E7A924B794CfB038994e" as const,
+      BONDING_CURVE: "0x1228b0dc9481C11D3071E7A924B794CfB038994e" as const, // Curve
       LENS: "0xB056d79CA5257589692699a46623F901a3BB76f1" as const,
       DEX_ROUTER: "0x5D4a4f430cA3B1b2dB86B9cFE48a5316800F5fb2" as const,
       WMON: "0x5a4E0bFDeF88C9032CB4d24338C5EB3d3870BfDd" as const,
@@ -27,25 +27,30 @@ const NADFUN_CONTRACTS = isTestnet
 nadfunLogger.info(`Using ${isTestnet ? "testnet" : "mainnet"} nad.fun contracts`);
 nadfunLogger.info(`  BondingCurveRouter: ${NADFUN_CONTRACTS.CORE}`);
 
-// ICore ABI (createCurve function)
-const CORE_ABI = [
+// ── ABIs from official nad.fun SDK ──────────────────────
+
+const BONDING_CURVE_ROUTER_ABI = [
   {
     type: "function",
-    name: "createCurve",
+    name: "create",
     inputs: [
-      { name: "creator", type: "address" },
-      { name: "name", type: "string" },
-      { name: "symbol", type: "string" },
-      { name: "tokenURI", type: "string" },
-      { name: "amountIn", type: "uint256" },
-      { name: "fee", type: "uint256" },
+      {
+        name: "params",
+        type: "tuple",
+        internalType: "struct IBondingCurveRouter.TokenCreationParams",
+        components: [
+          { name: "name", type: "string" },
+          { name: "symbol", type: "string" },
+          { name: "tokenURI", type: "string" },
+          { name: "amountOut", type: "uint256" },
+          { name: "salt", type: "bytes32" },
+          { name: "actionId", type: "uint8" },
+        ],
+      },
     ],
     outputs: [
-      { name: "curve", type: "address" },
       { name: "token", type: "address" },
-      { name: "virtualNative", type: "uint256" },
-      { name: "virtualToken", type: "uint256" },
-      { name: "amountOut", type: "uint256" },
+      { name: "pool", type: "address" },
     ],
     stateMutability: "payable",
   },
@@ -53,11 +58,17 @@ const CORE_ABI = [
     type: "function",
     name: "buy",
     inputs: [
-      { name: "amountIn", type: "uint256" },
-      { name: "fee", type: "uint256" },
-      { name: "token", type: "address" },
-      { name: "to", type: "address" },
-      { name: "deadline", type: "uint256" },
+      {
+        name: "params",
+        type: "tuple",
+        internalType: "struct IBondingCurveRouter.BuyParams",
+        components: [
+          { name: "amountOutMin", type: "uint256" },
+          { name: "token", type: "address" },
+          { name: "to", type: "address" },
+          { name: "deadline", type: "uint256" },
+        ],
+      },
     ],
     outputs: [],
     stateMutability: "payable",
@@ -66,13 +77,90 @@ const CORE_ABI = [
     type: "function",
     name: "sell",
     inputs: [
-      { name: "amountIn", type: "uint256" },
-      { name: "token", type: "address" },
-      { name: "to", type: "address" },
-      { name: "deadline", type: "uint256" },
+      {
+        name: "params",
+        type: "tuple",
+        internalType: "struct IBondingCurveRouter.SellParams",
+        components: [
+          { name: "amountIn", type: "uint256" },
+          { name: "amountOutMin", type: "uint256" },
+          { name: "token", type: "address" },
+          { name: "to", type: "address" },
+          { name: "deadline", type: "uint256" },
+        ],
+      },
     ],
     outputs: [],
     stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "sellPermit",
+    inputs: [
+      {
+        name: "params",
+        type: "tuple",
+        internalType: "struct IBondingCurveRouter.SellPermitParams",
+        components: [
+          { name: "amountIn", type: "uint256" },
+          { name: "amountOutMin", type: "uint256" },
+          { name: "amountAllowance", type: "uint256" },
+          { name: "token", type: "address" },
+          { name: "to", type: "address" },
+          { name: "deadline", type: "uint256" },
+          { name: "v", type: "uint8" },
+          { name: "r", type: "bytes32" },
+          { name: "s", type: "bytes32" },
+        ],
+      },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "availableBuyTokens",
+    inputs: [{ name: "token", type: "address" }],
+    outputs: [
+      { name: "availableBuyToken", type: "uint256" },
+      { name: "requiredMonAmount", type: "uint256" },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getAmountOutWithFee",
+    inputs: [
+      { name: "token", type: "address" },
+      { name: "amountIn", type: "uint256" },
+      { name: "isBuy", type: "bool" },
+    ],
+    outputs: [{ name: "amountOut", type: "uint256" }],
+    stateMutability: "view",
+  },
+] as const;
+
+const LENS_ABI = [
+  {
+    type: "function",
+    name: "getAmountOut",
+    inputs: [
+      { name: "token", type: "address" },
+      { name: "amountIn", type: "uint256" },
+      { name: "isBuy", type: "bool" },
+    ],
+    outputs: [
+      { name: "router", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getInitialBuyAmountOut",
+    inputs: [{ name: "amountIn", type: "uint256" }],
+    outputs: [{ name: "amountOut", type: "uint256" }],
+    stateMutability: "view",
   },
 ] as const;
 
@@ -104,7 +192,6 @@ async function uploadTokenImage(imageUrl: string): Promise<string> {
   nadfunLogger.info("Uploading token image to nad.fun...");
 
   try {
-    // Fetch the image first
     const imageResponse = await fetch(imageUrl);
     const imageBlob = await imageResponse.blob();
 
@@ -125,7 +212,7 @@ async function uploadTokenImage(imageUrl: string): Promise<string> {
     return data.url;
   } catch (err) {
     nadfunLogger.error("Failed to upload token image, using placeholder", err);
-    return imageUrl; // Fallback to original URL
+    return imageUrl;
   }
 }
 
@@ -169,10 +256,18 @@ async function uploadTokenMetadata(
 }
 
 /**
- * Create $CLAW token on nad.fun via the BondingCurveRouter
+ * Create $CLAW token on nad.fun via BondingCurveRouter.create()
+ *
+ * The create function takes a TokenCreationParams struct:
+ *   { name, symbol, tokenURI, amountOut, salt, actionId }
+ *
+ * msg.value = total MON to send (covers creation fee + initial buy)
+ * amountOut = 0 for no initial buy, or the expected token output
+ * salt = random bytes32 for deterministic token address
+ * actionId = 0 for standard creation
  */
 export async function createClawToken(
-  initialBuyAmount: bigint = parseEther("1")
+  initialBuyMON: bigint = parseEther("1")
 ): Promise<CreateTokenResult> {
   if (!walletClient || !walletClient.account) {
     throw new Error("Operator wallet not configured");
@@ -180,7 +275,7 @@ export async function createClawToken(
 
   const creatorAddress = walletClient.account.address;
   nadfunLogger.info(
-    `Creating $CLAW token from ${creatorAddress} with initial buy: ${initialBuyAmount}`
+    `Creating $CLAW token from ${creatorAddress} with initial buy: ${initialBuyMON}`
   );
 
   // Token metadata
@@ -192,12 +287,12 @@ export async function createClawToken(
       "Watch AI agents lie, deceive, and deduce in real-time with real MON stakes. " +
       "$CLAW powers the game economy: stake to play premium games, bet on outcomes, " +
       "earn leaderboard rewards, and govern the protocol.",
-    image: "", // Will be set after upload
+    image: "",
     twitter: "https://x.com/amongclaws",
     website: "https://amongclaws.xyz",
   };
 
-  // Step 1: Upload image (using a generated or placeholder lobster claw image)
+  // Step 1: Upload image
   const clawImageUrl =
     "https://raw.githubusercontent.com/kamalbuilds/among-claws/main/assets/claw-token.png";
   const uploadedImageUrl = await uploadTokenImage(clawImageUrl).catch(
@@ -206,28 +301,50 @@ export async function createClawToken(
   metadata.image = uploadedImageUrl;
 
   // Step 2: Upload metadata
-  const tokenURI = await uploadTokenMetadata(metadata);
+  let tokenURI: string;
+  try {
+    tokenURI = await uploadTokenMetadata(metadata);
+  } catch {
+    // Fallback to inline metadata
+    tokenURI = `data:application/json,${encodeURIComponent(JSON.stringify(metadata))}`;
+  }
 
-  // Step 3: Calculate fee (nad.fun deploy fee ~10 MON)
-  const deployFee = parseEther("10");
-  const totalValue = deployFee + initialBuyAmount;
+  // Step 3: Estimate initial buy output via Lens
+  let amountOut = BigInt(0);
+  if (initialBuyMON > BigInt(0)) {
+    try {
+      amountOut = await publicClient.readContract({
+        address: NADFUN_CONTRACTS.LENS,
+        abi: LENS_ABI,
+        functionName: "getInitialBuyAmountOut",
+        args: [initialBuyMON],
+      });
+      nadfunLogger.info(`Expected initial buy output: ${amountOut} tokens`);
+    } catch {
+      nadfunLogger.warn("Could not estimate initial buy output, using 0");
+    }
+  }
 
-  // Step 4: Create curve on-chain
-  nadfunLogger.info("Submitting createCurve transaction...");
+  // Step 4: Create token on-chain
+  const salt = keccak256(toHex(`among-claws-${Date.now()}`));
+
+  nadfunLogger.info("Submitting create transaction...");
 
   const txHash = await walletClient.writeContract({
     address: NADFUN_CONTRACTS.CORE,
-    abi: CORE_ABI,
-    functionName: "createCurve",
+    abi: BONDING_CURVE_ROUTER_ABI,
+    functionName: "create",
     args: [
-      creatorAddress,
-      metadata.name,
-      metadata.symbol,
-      tokenURI,
-      initialBuyAmount,
-      deployFee,
+      {
+        name: metadata.name,
+        symbol: metadata.symbol,
+        tokenURI,
+        amountOut: BigInt(0), // min output (0 = no slippage protection for creation)
+        salt,
+        actionId: 0,
+      },
     ],
-    value: totalValue,
+    value: initialBuyMON, // msg.value covers fee + initial buy
     chain: monad,
     account: walletClient.account,
   });
@@ -243,34 +360,31 @@ export async function createClawToken(
     throw new Error(`Token creation reverted: ${txHash}`);
   }
 
-  // Parse logs to get token and curve addresses
-  // The Create event has: owner, curve, token, tokenURI, name, symbol, virtualNative, virtualToken
-  const createEventTopic =
-    "0x" +
-    "0000000000000000000000000000000000000000000000000000000000000000"; // Will parse from logs
-
+  // Parse logs for token and pool addresses
   let tokenAddress = "";
   let curveAddress = "";
 
   for (const log of receipt.logs) {
+    // CurveCreate event from the Curve contract
     if (log.address.toLowerCase() === NADFUN_CONTRACTS.BONDING_CURVE.toLowerCase()) {
-      // Parse the Create event
-      if (log.topics.length >= 4) {
+      if (log.topics.length >= 3) {
+        // CurveCreate: creator(indexed), token(indexed), pool(indexed), ...
+        tokenAddress = `0x${log.topics[1]?.slice(26) || ""}`;
         curveAddress = `0x${log.topics[2]?.slice(26) || ""}`;
-        tokenAddress = `0x${log.topics[3]?.slice(26) || ""}`;
+        if (tokenAddress.length === 42) break;
       }
     }
   }
 
-  // Fallback: try reading from transaction receipt logs
-  if (!tokenAddress) {
+  // Fallback: scan all logs for address-like topics
+  if (!tokenAddress || tokenAddress.length !== 42) {
     for (const log of receipt.logs) {
-      if (log.topics.length >= 3 && log.data.length > 2) {
-        // Look for the first address-like topic after the event signature
-        const possibleToken = `0x${log.topics[2]?.slice(26) || ""}`;
-        if (possibleToken.length === 42) {
-          tokenAddress = possibleToken;
-          curveAddress = `0x${log.topics[1]?.slice(26) || ""}`;
+      if (log.topics.length >= 3) {
+        const addr1 = `0x${log.topics[1]?.slice(26) || ""}`;
+        const addr2 = `0x${log.topics[2]?.slice(26) || ""}`;
+        if (addr1.length === 42 && addr2.length === 42) {
+          tokenAddress = addr1;
+          curveAddress = addr2;
           break;
         }
       }
@@ -290,7 +404,10 @@ export async function createClawToken(
 }
 
 /**
- * Buy $CLAW tokens on nad.fun
+ * Buy $CLAW tokens on nad.fun via BondingCurveRouter.buy()
+ *
+ * Sends MON as msg.value, receives tokens.
+ * The router handles fee calculation internally.
  */
 export async function buyClawTokens(
   tokenAddress: string,
@@ -300,21 +417,21 @@ export async function buyClawTokens(
     throw new Error("Operator wallet not configured");
   }
 
-  const deadline = BigInt(Math.floor(Date.now() / 1000) + 600); // 10 min deadline
-  const fee = (amountMON * BigInt(100)) / BigInt(10000); // 1% fee estimate
+  const deadline = BigInt(Math.floor(Date.now() / 1000) + 600);
 
   const txHash = await walletClient.writeContract({
     address: NADFUN_CONTRACTS.CORE,
-    abi: CORE_ABI,
+    abi: BONDING_CURVE_ROUTER_ABI,
     functionName: "buy",
     args: [
-      amountMON,
-      fee,
-      tokenAddress as Hex,
-      walletClient.account.address,
-      deadline,
+      {
+        amountOutMin: BigInt(0), // no slippage protection
+        token: tokenAddress as Hex,
+        to: walletClient.account.address,
+        deadline,
+      },
     ],
-    value: amountMON + fee,
+    value: amountMON,
     chain: monad,
     account: walletClient.account,
   });
@@ -324,7 +441,9 @@ export async function buyClawTokens(
 }
 
 /**
- * Sell $CLAW tokens on nad.fun
+ * Sell $CLAW tokens on nad.fun via BondingCurveRouter.sell()
+ *
+ * Requires prior ERC20 approve() for the router.
  */
 export async function sellClawTokens(
   tokenAddress: string,
@@ -338,13 +457,16 @@ export async function sellClawTokens(
 
   const txHash = await walletClient.writeContract({
     address: NADFUN_CONTRACTS.CORE,
-    abi: CORE_ABI,
+    abi: BONDING_CURVE_ROUTER_ABI,
     functionName: "sell",
     args: [
-      tokenAmount,
-      tokenAddress as Hex,
-      walletClient.account.address,
-      deadline,
+      {
+        amountIn: tokenAmount,
+        amountOutMin: BigInt(0), // no slippage protection
+        token: tokenAddress as Hex,
+        to: walletClient.account.address,
+        deadline,
+      },
     ],
     chain: monad,
     account: walletClient.account,

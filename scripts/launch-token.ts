@@ -6,10 +6,10 @@
  *   npx tsx scripts/launch-token.ts
  *
  * Requires:
- *   OPERATOR_PRIVATE_KEY in .env (with ~12 MON for deploy fee + initial buy)
+ *   OPERATOR_PRIVATE_KEY in .env (with ~2 MON for deploy + initial buy)
  */
 
-import { createPublicClient, createWalletClient, http, parseEther, type Chain } from "viem";
+import { createPublicClient, createWalletClient, http, parseEther, keccak256, toHex, type Chain } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import * as dotenv from "dotenv";
 import * as path from "path";
@@ -30,36 +30,61 @@ const monad = {
   blockExplorers: { default: { name: "MonadExplorer", url: isTestnet ? "https://testnet.monadexplorer.com" : "https://monadexplorer.com" } },
 } as const satisfies Chain;
 
-// Testnet vs mainnet BondingCurveRouter
+// BondingCurveRouter (testnet vs mainnet)
 const BONDING_CURVE_ROUTER = isTestnet
   ? ("0x865054F0F6A288adaAc30261731361EA7E908003" as const)
   : ("0x6F6B8F1a20703309951a5127c45B49b1CD981A22" as const);
+
+// Curve contract for event parsing
+const CURVE_CONTRACT = isTestnet
+  ? ("0x1228b0dc9481C11D3071E7A924B794CfB038994e" as const)
+  : ("0xA7283d07812a02AFB7C09B60f8896bCEA3F90aCE" as const);
+
+// Lens contract for quote
+const LENS_CONTRACT = isTestnet
+  ? ("0xB056d79CA5257589692699a46623F901a3BB76f1" as const)
+  : ("0x7e78A8DE94f21804F7a17F4E8BF9EC2c872187ea" as const);
 
 // Testnet vs mainnet API for metadata uploads
 const NADFUN_API_BASE = isTestnet
   ? "https://dev-api.nad.fun"
   : "https://api.nadapp.net";
 
-const CORE_ABI = [
+// ABI from official nad.fun SDK — BondingCurveRouter.create()
+const ROUTER_ABI = [
   {
     type: "function",
-    name: "createCurve",
+    name: "create",
     inputs: [
-      { name: "creator", type: "address" },
-      { name: "name", type: "string" },
-      { name: "symbol", type: "string" },
-      { name: "tokenURI", type: "string" },
-      { name: "amountIn", type: "uint256" },
-      { name: "fee", type: "uint256" },
+      {
+        name: "params",
+        type: "tuple",
+        internalType: "struct IBondingCurveRouter.TokenCreationParams",
+        components: [
+          { name: "name", type: "string" },
+          { name: "symbol", type: "string" },
+          { name: "tokenURI", type: "string" },
+          { name: "amountOut", type: "uint256" },
+          { name: "salt", type: "bytes32" },
+          { name: "actionId", type: "uint8" },
+        ],
+      },
     ],
     outputs: [
-      { name: "curve", type: "address" },
       { name: "token", type: "address" },
-      { name: "virtualNative", type: "uint256" },
-      { name: "virtualToken", type: "uint256" },
-      { name: "amountOut", type: "uint256" },
+      { name: "pool", type: "address" },
     ],
     stateMutability: "payable",
+  },
+] as const;
+
+const LENS_ABI = [
+  {
+    type: "function",
+    name: "getInitialBuyAmountOut",
+    inputs: [{ name: "amountIn", type: "uint256" }],
+    outputs: [{ name: "amountOut", type: "uint256" }],
+    stateMutability: "view",
   },
 ] as const;
 
@@ -93,8 +118,8 @@ async function main() {
   const balanceMON = Number(balance) / 1e18;
   console.log(`   Balance: ${balanceMON.toFixed(4)} MON`);
 
-  if (balanceMON < 12) {
-    console.error(`\n   Need at least 12 MON (10 deploy fee + 2 initial buy). Current: ${balanceMON}`);
+  if (balanceMON < 1) {
+    console.error(`\n   Need at least 1 MON. Current: ${balanceMON}`);
     console.log(`   Get MON from faucet: POST https://agents.devnads.com/v1/faucet`);
     process.exit(1);
   }
@@ -145,29 +170,45 @@ async function main() {
     tokenURI = `data:application/json,${encodeURIComponent(JSON.stringify(tokenMetadata))}`;
   }
 
-  const deployFee = parseEther("10");
-  const initialBuy = parseEther("1");
-  const totalValue = deployFee + initialBuy;
+  // Use most of balance for creation (leave some for gas)
+  const initialBuy = parseEther("0.5");
+
+  // Estimate output tokens
+  let expectedTokens = BigInt(0);
+  try {
+    expectedTokens = await publicClient.readContract({
+      address: LENS_CONTRACT,
+      abi: LENS_ABI,
+      functionName: "getInitialBuyAmountOut",
+      args: [initialBuy],
+    });
+    console.log(`\n   Expected tokens from initial buy: ${expectedTokens}`);
+  } catch {
+    console.log(`\n   Could not estimate initial buy output`);
+  }
+
+  const salt = keccak256(toHex(`among-claws-${Date.now()}`));
 
   console.log(`\n   Creating $CLAW on nad.fun...`);
-  console.log(`   Deploy fee: 10 MON`);
-  console.log(`   Initial buy: 1 MON`);
-  console.log(`   Total cost: 11 MON`);
+  console.log(`   Initial buy value: ${Number(initialBuy) / 1e18} MON (sent as msg.value)`);
+  console.log(`   Salt: ${salt.slice(0, 18)}...`);
 
   try {
     const txHash = await wallet.writeContract({
       address: BONDING_CURVE_ROUTER,
-      abi: CORE_ABI,
-      functionName: "createCurve",
+      abi: ROUTER_ABI,
+      functionName: "create",
       args: [
-        account.address,
-        "Among Claws",
-        "CLAW",
-        tokenURI,
-        initialBuy,
-        deployFee,
+        {
+          name: "Among Claws",
+          symbol: "CLAW",
+          tokenURI,
+          amountOut: BigInt(0), // no min output for creation
+          salt,
+          actionId: 0,
+        },
       ],
-      value: totalValue,
+      value: initialBuy,
     });
 
     console.log(`\n   TX submitted: ${txHash}`);
@@ -183,11 +224,30 @@ async function main() {
     // Parse token address from logs
     let tokenAddress = "";
     let curveAddress = "";
+
+    // Look for CurveCreate event from the Curve contract
     for (const log of receipt.logs) {
-      if (log.topics.length >= 4) {
-        curveAddress = `0x${log.topics[2]?.slice(26) || ""}`;
-        tokenAddress = `0x${log.topics[3]?.slice(26) || ""}`;
-        if (tokenAddress.length === 42) break;
+      if (log.address.toLowerCase() === CURVE_CONTRACT.toLowerCase()) {
+        if (log.topics.length >= 3) {
+          tokenAddress = `0x${log.topics[1]?.slice(26) || ""}`;
+          curveAddress = `0x${log.topics[2]?.slice(26) || ""}`;
+          if (tokenAddress.length === 42) break;
+        }
+      }
+    }
+
+    // Fallback
+    if (!tokenAddress || tokenAddress.length !== 42) {
+      for (const log of receipt.logs) {
+        if (log.topics.length >= 3) {
+          const addr1 = `0x${log.topics[1]?.slice(26) || ""}`;
+          const addr2 = `0x${log.topics[2]?.slice(26) || ""}`;
+          if (addr1.length === 42 && addr2.length === 42) {
+            tokenAddress = addr1;
+            curveAddress = addr2;
+            break;
+          }
+        }
       }
     }
 
