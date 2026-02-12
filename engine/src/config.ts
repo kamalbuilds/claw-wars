@@ -3,8 +3,8 @@ dotenv.config();
 
 export const config = {
   monad: {
-    rpcUrl: process.env.MONAD_RPC_URL || "https://rpc.monad.xyz",
-    chainId: parseInt(process.env.MONAD_CHAIN_ID || "143", 10),
+    rpcUrl: process.env.MONAD_RPC_URL || "https://testnet-rpc.monad.xyz",
+    chainId: parseInt(process.env.MONAD_CHAIN_ID || "10143", 10),
   },
   operator: {
     privateKey: process.env.OPERATOR_PRIVATE_KEY || "",

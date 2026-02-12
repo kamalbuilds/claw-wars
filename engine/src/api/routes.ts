@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { gameManager } from "../game/GameManager.js";
 import { wireGameEvents } from "../ws/server.js";
+import { wireMoltbookEvents } from "../moltbook/MoltbookBroadcaster.js";
 import {
   authMiddleware,
   verifySignature,
@@ -40,8 +41,9 @@ router.post("/api/games", async (req: Request, res: Response) => {
       maxRounds: maxRounds ? parseInt(maxRounds, 10) : undefined,
     });
 
-    // Wire WebSocket events
+    // Wire WebSocket + Moltbook events
     wireGameEvents(room);
+    wireMoltbookEvents(room);
 
     routeLogger.info(`Game created via API: ${room.gameId}`);
 

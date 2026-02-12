@@ -5,14 +5,27 @@ import { config } from "../config.js";
 
 const nadfunLogger = logger.child("NadFun");
 
-// Nad.fun mainnet contract addresses
-const NADFUN_CONTRACTS = {
-  CORE: "0x6F6B8F1a20703309951a5127c45B49b1CD981A22" as const, // BondingCurveRouter
-  BONDING_CURVE: "0xA7283d07812a02AFB7C09B60f8896bCEA3F90aCE" as const,
-  LENS: "0x7e78A8DE94f21804F7a17F4E8BF9EC2c872187ea" as const,
-  DEX_ROUTER: "0x0B79d71AE99528D1dB24A4148b5f4F865cc2b137" as const,
-  WMON: "0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A" as const,
-};
+const isTestnet = config.monad.chainId === 10143;
+
+// Nad.fun contract addresses (testnet vs mainnet)
+const NADFUN_CONTRACTS = isTestnet
+  ? {
+      CORE: "0x865054F0F6A288adaAc30261731361EA7E908003" as const, // BondingCurveRouter
+      BONDING_CURVE: "0x1228b0dc9481C11D3071E7A924B794CfB038994e" as const,
+      LENS: "0xB056d79CA5257589692699a46623F901a3BB76f1" as const,
+      DEX_ROUTER: "0x5D4a4f430cA3B1b2dB86B9cFE48a5316800F5fb2" as const,
+      WMON: "0x5a4E0bFDeF88C9032CB4d24338C5EB3d3870BfDd" as const,
+    }
+  : {
+      CORE: "0x6F6B8F1a20703309951a5127c45B49b1CD981A22" as const,
+      BONDING_CURVE: "0xA7283d07812a02AFB7C09B60f8896bCEA3F90aCE" as const,
+      LENS: "0x7e78A8DE94f21804F7a17F4E8BF9EC2c872187ea" as const,
+      DEX_ROUTER: "0x0B79d71AE99528D1dB24A4148b5f4F865cc2b137" as const,
+      WMON: "0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A" as const,
+    };
+
+nadfunLogger.info(`Using ${isTestnet ? "testnet" : "mainnet"} nad.fun contracts`);
+nadfunLogger.info(`  BondingCurveRouter: ${NADFUN_CONTRACTS.CORE}`);
 
 // ICore ABI (createCurve function)
 const CORE_ABI = [
@@ -63,8 +76,10 @@ const CORE_ABI = [
   },
 ] as const;
 
-// Nad.fun REST API
-const NADFUN_API_BASE = "https://api.nadapp.net";
+// Nad.fun REST API (testnet vs mainnet)
+const NADFUN_API_BASE = isTestnet
+  ? "https://dev-api.nad.fun"
+  : "https://api.nadapp.net";
 
 export interface TokenMetadata {
   name: string;
@@ -130,7 +145,10 @@ async function uploadTokenMetadata(
         name: metadata.name,
         symbol: metadata.symbol,
         description: metadata.description,
-        image: metadata.image,
+        // Testnet API uses image_uri, mainnet uses image
+        ...(isTestnet
+          ? { image_uri: metadata.image }
+          : { image: metadata.image }),
         twitter: metadata.twitter || "",
         telegram: metadata.telegram || "",
         website: metadata.website || "",
@@ -341,7 +359,7 @@ export async function sellClawTokens(
  */
 export async function getTokenInfo(tokenAddress: string) {
   const response = await fetch(
-    `https://testnet-bot-api-server.nad.fun/token/${tokenAddress}`
+    `${NADFUN_API_BASE}/token/${tokenAddress}`
   );
   if (!response.ok) {
     throw new Error(`Failed to fetch token info: ${response.status}`);
@@ -354,7 +372,7 @@ export async function getTokenInfo(tokenAddress: string) {
  */
 export async function getTokenMarket(tokenAddress: string) {
   const response = await fetch(
-    `https://testnet-bot-api-server.nad.fun/token/market/${tokenAddress}`
+    `${NADFUN_API_BASE}/token/market/${tokenAddress}`
   );
   if (!response.ok) {
     throw new Error(`Failed to fetch market data: ${response.status}`);
