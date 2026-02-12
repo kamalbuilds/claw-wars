@@ -118,8 +118,8 @@ async function main() {
   const balanceMON = Number(balance) / 1e18;
   console.log(`   Balance: ${balanceMON.toFixed(4)} MON`);
 
-  if (balanceMON < 1) {
-    console.error(`\n   Need at least 1 MON. Current: ${balanceMON}`);
+  if (balanceMON < 11) {
+    console.error(`\n   Need at least 11 MON (10 creation fee + 1 initial buy). Current: ${balanceMON}`);
     console.log(`   Get MON from faucet: POST https://agents.devnads.com/v1/faucet`);
     process.exit(1);
   }
@@ -139,58 +139,125 @@ async function main() {
 
   console.log(`\n   Uploading metadata...`);
 
-  // Upload metadata to nad.fun
+  // Step 1: Upload metadata to nad.fun API
+  // The proper flow: upload metadata → get metadata_uri → mine salt → create on-chain
   let tokenURI = "";
   try {
-    const metaResponse = await fetch(`${NADFUN_API_BASE}/agent/token/metadata`, {
+    // Upload metadata (no image for now)
+    const metaResponse = await fetch(`${NADFUN_API_BASE}/metadata/metadata`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: tokenMetadata.name,
         symbol: tokenMetadata.symbol,
         description: tokenMetadata.description,
-        ...(isTestnet
-          ? { image_uri: tokenMetadata.image }
-          : { image: tokenMetadata.image }),
+        image_uri: "", // no image yet
         twitter: tokenMetadata.twitter || "",
         website: tokenMetadata.website || "",
       }),
     });
 
     if (metaResponse.ok) {
-      const metaData = (await metaResponse.json()) as { uri: string };
-      tokenURI = metaData.uri;
+      const metaData = (await metaResponse.json()) as { metadata_uri: string };
+      tokenURI = metaData.metadata_uri;
       console.log(`   Metadata URI: ${tokenURI}`);
     } else {
-      console.log(`   Metadata upload returned ${metaResponse.status}, using inline URI`);
-      tokenURI = `data:application/json,${encodeURIComponent(JSON.stringify(tokenMetadata))}`;
+      const errText = await metaResponse.text();
+      console.log(`   Metadata upload returned ${metaResponse.status}: ${errText}`);
+      // Try legacy endpoint
+      const legacyResponse = await fetch(`${NADFUN_API_BASE}/agent/token/metadata`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: tokenMetadata.name,
+          symbol: tokenMetadata.symbol,
+          description: tokenMetadata.description,
+          image_uri: "",
+          twitter: tokenMetadata.twitter || "",
+          website: tokenMetadata.website || "",
+        }),
+      });
+      if (legacyResponse.ok) {
+        const legacyData = (await legacyResponse.json()) as { uri?: string; metadata_uri?: string };
+        tokenURI = legacyData.metadata_uri || legacyData.uri || "";
+        console.log(`   Metadata URI (legacy): ${tokenURI}`);
+      } else {
+        const legacyErr = await legacyResponse.text();
+        console.log(`   Legacy endpoint returned ${legacyResponse.status}: ${legacyErr}`);
+        tokenURI = `data:application/json,${encodeURIComponent(JSON.stringify(tokenMetadata))}`;
+        console.log(`   Using inline URI as fallback`);
+      }
     }
-  } catch {
-    console.log(`   Metadata upload failed, using inline URI`);
+  } catch (err) {
+    console.log(`   Metadata upload failed: ${err}`);
     tokenURI = `data:application/json,${encodeURIComponent(JSON.stringify(tokenMetadata))}`;
   }
 
-  // Use most of balance for creation (leave some for gas)
-  const initialBuy = parseEther("0.5");
-
-  // Estimate output tokens
-  let expectedTokens = BigInt(0);
+  // Step 2: Mine salt via API (required for on-chain create)
+  let salt = keccak256(toHex(`among-claws-${Date.now()}`)); // fallback
   try {
-    expectedTokens = await publicClient.readContract({
-      address: LENS_CONTRACT,
-      abi: LENS_ABI,
-      functionName: "getInitialBuyAmountOut",
-      args: [initialBuy],
+    console.log(`\n   Mining salt via API...`);
+    const saltResponse = await fetch(`${NADFUN_API_BASE}/token/salt`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        creator: account.address,
+        name: "Among Claws",
+        symbol: "CLAW",
+        metadataUri: tokenURI,
+      }),
     });
-    console.log(`\n   Expected tokens from initial buy: ${expectedTokens}`);
-  } catch {
-    console.log(`\n   Could not estimate initial buy output`);
+    if (saltResponse.ok) {
+      const saltData = (await saltResponse.json()) as { salt: string; address: string };
+      salt = saltData.salt as `0x${string}`;
+      console.log(`   Salt: ${salt.slice(0, 18)}...`);
+      console.log(`   Predicted token address: ${saltData.address}`);
+    } else {
+      const saltErr = await saltResponse.text();
+      console.log(`   Salt API returned ${saltResponse.status}: ${saltErr}`);
+      console.log(`   Using local salt: ${salt.slice(0, 18)}...`);
+    }
+  } catch (err) {
+    console.log(`   Salt API failed: ${err}, using local salt`);
   }
 
-  const salt = keccak256(toHex(`among-claws-${Date.now()}`));
+  // Step 3: Get deploy fee from Curve contract
+  // feeConfig() returns (deployFeeAmount, graduateFeeAmount, protocolFee)
+  let deployFee = parseEther("10"); // default 10 MON
+  try {
+    const feeConfig = await publicClient.readContract({
+      address: CURVE_CONTRACT,
+      abi: [{
+        type: "function",
+        name: "feeConfig",
+        inputs: [],
+        outputs: [{
+          name: "",
+          type: "tuple",
+          components: [
+            { name: "deployFeeAmount", type: "uint256" },
+            { name: "graduateFeeAmount", type: "uint256" },
+            { name: "protocolFee", type: "uint24" },
+          ],
+        }],
+        stateMutability: "view",
+      }] as const,
+      functionName: "feeConfig",
+    });
+    deployFee = (feeConfig as { deployFeeAmount: bigint }).deployFeeAmount;
+    console.log(`   Deploy fee from contract: ${Number(deployFee) / 1e18} MON`);
+  } catch {
+    console.log(`   Could not read feeConfig, using default 10 MON`);
+  }
+
+  // Total value = deploy fee + initial buy amount
+  const actualInitialBuy = parseEther("1"); // 1 MON for initial buy
+  const totalValue = deployFee + actualInitialBuy;
 
   console.log(`\n   Creating $CLAW on nad.fun...`);
-  console.log(`   Initial buy value: ${Number(initialBuy) / 1e18} MON (sent as msg.value)`);
+  console.log(`   Deploy fee: ${Number(deployFee) / 1e18} MON`);
+  console.log(`   Initial buy: ${Number(actualInitialBuy) / 1e18} MON`);
+  console.log(`   Total value: ${Number(totalValue) / 1e18} MON (sent as msg.value)`);
   console.log(`   Salt: ${salt.slice(0, 18)}...`);
 
   try {
@@ -205,10 +272,10 @@ async function main() {
           tokenURI,
           amountOut: BigInt(0), // no min output for creation
           salt,
-          actionId: 0,
+          actionId: 1, // CapricornActor - standard creation (SDK hardcodes this)
         },
       ],
-      value: initialBuy,
+      value: totalValue,
     });
 
     console.log(`\n   TX submitted: ${txHash}`);
@@ -226,27 +293,13 @@ async function main() {
     let curveAddress = "";
 
     // Look for CurveCreate event from the Curve contract
+    // Event: CurveCreate(address indexed creator, address indexed token, address indexed pool, ...)
     for (const log of receipt.logs) {
       if (log.address.toLowerCase() === CURVE_CONTRACT.toLowerCase()) {
-        if (log.topics.length >= 3) {
-          tokenAddress = `0x${log.topics[1]?.slice(26) || ""}`;
-          curveAddress = `0x${log.topics[2]?.slice(26) || ""}`;
+        if (log.topics.length >= 4) {
+          tokenAddress = `0x${log.topics[2]?.slice(26) || ""}`;
+          curveAddress = `0x${log.topics[3]?.slice(26) || ""}`;
           if (tokenAddress.length === 42) break;
-        }
-      }
-    }
-
-    // Fallback
-    if (!tokenAddress || tokenAddress.length !== 42) {
-      for (const log of receipt.logs) {
-        if (log.topics.length >= 3) {
-          const addr1 = `0x${log.topics[1]?.slice(26) || ""}`;
-          const addr2 = `0x${log.topics[2]?.slice(26) || ""}`;
-          if (addr1.length === 42 && addr2.length === 42) {
-            tokenAddress = addr1;
-            curveAddress = addr2;
-            break;
-          }
         }
       }
     }

@@ -264,7 +264,7 @@ async function uploadTokenMetadata(
  * msg.value = total MON to send (covers creation fee + initial buy)
  * amountOut = 0 for no initial buy, or the expected token output
  * salt = random bytes32 for deterministic token address
- * actionId = 0 for standard creation
+ * actionId = 1 for standard creation (CapricornActor)
  */
 export async function createClawToken(
   initialBuyMON: bigint = parseEther("1")
@@ -341,7 +341,7 @@ export async function createClawToken(
         tokenURI,
         amountOut: BigInt(0), // min output (0 = no slippage protection for creation)
         salt,
-        actionId: 0,
+        actionId: 1, // CapricornActor - standard creation
       },
     ],
     value: initialBuyMON, // msg.value covers fee + initial buy
@@ -366,27 +366,12 @@ export async function createClawToken(
 
   for (const log of receipt.logs) {
     // CurveCreate event from the Curve contract
+    // Event: CurveCreate(address indexed creator, address indexed token, address indexed pool, ...)
     if (log.address.toLowerCase() === NADFUN_CONTRACTS.BONDING_CURVE.toLowerCase()) {
-      if (log.topics.length >= 3) {
-        // CurveCreate: creator(indexed), token(indexed), pool(indexed), ...
-        tokenAddress = `0x${log.topics[1]?.slice(26) || ""}`;
-        curveAddress = `0x${log.topics[2]?.slice(26) || ""}`;
+      if (log.topics.length >= 4) {
+        tokenAddress = `0x${log.topics[2]?.slice(26) || ""}`;
+        curveAddress = `0x${log.topics[3]?.slice(26) || ""}`;
         if (tokenAddress.length === 42) break;
-      }
-    }
-  }
-
-  // Fallback: scan all logs for address-like topics
-  if (!tokenAddress || tokenAddress.length !== 42) {
-    for (const log of receipt.logs) {
-      if (log.topics.length >= 3) {
-        const addr1 = `0x${log.topics[1]?.slice(26) || ""}`;
-        const addr2 = `0x${log.topics[2]?.slice(26) || ""}`;
-        if (addr1.length === 42 && addr2.length === 42) {
-          tokenAddress = addr1;
-          curveAddress = addr2;
-          break;
-        }
       }
     }
   }
