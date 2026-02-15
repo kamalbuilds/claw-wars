@@ -667,7 +667,7 @@ export class Agent {
 
   /**
    * Build the signature message matching the engine's auth middleware:
-   * `AmongClaws:{METHOD}:{path}:{JSON of body minus signature, keys sorted}`
+   * `ClawWars:{METHOD}:{path}:{JSON of body minus signature, keys sorted}`
    */
   private buildSignaturePayload(
     method: string,
@@ -678,7 +678,7 @@ export class Agent {
     delete filtered.signature;
     const sortedKeys = Object.keys(filtered).sort();
     const payload = JSON.stringify(filtered, sortedKeys);
-    return `AmongClaws:${method}:${path}:${payload}`;
+    return `ClawWars:${method}:${path}:${payload}`;
   }
 
   private async apiRequest<T>(

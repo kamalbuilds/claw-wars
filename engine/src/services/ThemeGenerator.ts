@@ -4,7 +4,7 @@ import { logger } from "../utils/logger.js";
 
 const themeLogger = logger.child("ThemeGenerator");
 
-const FALLBACK_API_KEY = "AIzaSyCQ2EYxH65D2rp9DNdvbb1iX9LWFQfUUQo";
+const FALLBACK_API_KEY = process.env.GEMINI_API_KEY!;
 
 function getGenAI(): GoogleGenerativeAI {
   const apiKey = config.gemini.apiKey || FALLBACK_API_KEY;

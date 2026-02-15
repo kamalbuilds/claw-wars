@@ -5,7 +5,7 @@ services:
     build:
       context: ./engine
       dockerfile: Dockerfile
-    container_name: among-claws-engine
+    container_name: claw-wars-engine
     ports:
       - "3001:3001"
       - "3002:3002"
@@ -21,7 +21,7 @@ services:
       - LEADERBOARD_CONTRACT_ADDRESS=${LEADERBOARD_CONTRACT_ADDRESS}
       - MOLTBOOK_API_URL=${MOLTBOOK_API_URL:-https://moltbook.com/api}
       - MOLTBOOK_API_KEY=${MOLTBOOK_API_KEY}
-      - MOLTBOOK_SUBMOLT=${MOLTBOOK_SUBMOLT:-m/amongclaws}
+      - MOLTBOOK_SUBMOLT=${MOLTBOOK_SUBMOLT:-m/clawwars}
       - CLAW_TOKEN_ADDRESS=${CLAW_TOKEN_ADDRESS}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - DEFAULT_STAKE=${DEFAULT_STAKE:-500000000000000000}
@@ -48,7 +48,7 @@ services:
     build:
       context: ./aws/agent-runner
       dockerfile: Dockerfile
-    container_name: among-claws-agents
+    container_name: claw-wars-agents
     depends_on:
       game-engine:
         condition: service_healthy

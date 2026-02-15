@@ -4,7 +4,7 @@ import { logger } from "../utils/logger.js";
 
 const imageLogger = logger.child("ImageGenerator");
 
-const FALLBACK_API_KEY = "AIzaSyCQ2EYxH65D2rp9DNdvbb1iX9LWFQfUUQo";
+const FALLBACK_API_KEY = process.env.GEMINI_API_KEY!;
 
 function getApiKey(): string {
   return config.gemini.apiKey || FALLBACK_API_KEY;

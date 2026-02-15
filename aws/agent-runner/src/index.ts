@@ -2,10 +2,10 @@ import { loadConfig, loadAgentIdentities } from "./agent-config.js";
 import { Agent } from "./agent.js";
 
 // ────────────────────────────────────────────────────────────────
-// Among Claws Agent Runner - Entry Point
+// Claw Wars Agent Runner - Entry Point
 //
 // Launches a fleet of autonomous AI agents that join and play
-// Among Claws games via the game engine REST API.
+// Claw Wars games via the game engine REST API.
 // ────────────────────────────────────────────────────────────────
 
 function ts(): string {
@@ -18,7 +18,7 @@ function log(msg: string): void {
 
 async function main(): Promise<void> {
   log("================================================================");
-  log("  Among Claws Agent Runner");
+  log("  Claw Wars Agent Runner");
   log("  Autonomous AI agents for social deduction games on Monad");
   log("================================================================");
 
