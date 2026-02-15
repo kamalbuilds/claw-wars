@@ -1,7 +1,9 @@
 import { Router, type Request, type Response } from "express";
 import { gameManager } from "../game/GameManager.js";
+import { GameRoom } from "../game/GameRoom.js";
 import { wireGameEvents } from "../ws/server.js";
 import { wireMoltbookEvents } from "../moltbook/MoltbookBroadcaster.js";
+import { wireTwitterEvents } from "../services/TwitterBroadcaster.js";
 import {
   authMiddleware,
   verifySignature,
@@ -41,9 +43,10 @@ router.post("/api/games", async (req: Request, res: Response) => {
       maxRounds: maxRounds ? parseInt(maxRounds, 10) : undefined,
     });
 
-    // Wire WebSocket + Moltbook events
+    // Wire WebSocket + Moltbook + Twitter events
     wireGameEvents(room);
     wireMoltbookEvents(room);
+    wireTwitterEvents(room);
 
     routeLogger.info(`Game created via API: ${room.gameId}`);
 
@@ -424,6 +427,93 @@ router.post(
     }
   }
 );
+
+// ──────────────────────────────────────────
+// POST /api/demo - Launch a quick demo game with simulated agents
+// ──────────────────────────────────────────
+router.post("/api/demo", async (_req: Request, res: Response) => {
+  try {
+    const room = await gameManager.createGame({
+      minPlayers: 5,
+      maxPlayers: 5,
+      impostorCount: 1,
+      maxRounds: 3,
+      onChainEnabled: false, // off-chain for speed
+    });
+
+    wireGameEvents(room);
+    wireMoltbookEvents(room);
+    wireTwitterEvents(room);
+
+    // Generate 5 demo agents with deterministic addresses
+    const demoAgents = [
+      { name: "ClawMaster", address: "0x1111111111111111111111111111111111111111" as `0x${string}` },
+      { name: "ShellShock", address: "0x2222222222222222222222222222222222222222" as `0x${string}` },
+      { name: "PinchPoint", address: "0x3333333333333333333333333333333333333333" as `0x${string}` },
+      { name: "TideBreaker", address: "0x4444444444444444444444444444444444444444" as `0x${string}` },
+      { name: "ReefRunner", address: "0x5555555555555555555555555555555555555555" as `0x${string}` },
+    ];
+
+    for (const agent of demoAgents) {
+      room.addPlayer(agent.address, agent.name);
+    }
+
+    // Start game immediately
+    await room.start();
+
+    // Simulate discussion messages after a short delay
+    setTimeout(() => simulateDemoGame(room, demoAgents), 1000);
+
+    res.status(201).json({
+      gameId: room.gameId,
+      phase: "Discussion",
+      players: demoAgents.map((a) => a.name),
+      message: "Demo game started! Watch it live on the frontend.",
+    });
+  } catch (err) {
+    routeLogger.error("Failed to launch demo", err);
+    res.status(500).json({ error: "Failed to launch demo" });
+  }
+});
+
+async function simulateDemoGame(
+  room: GameRoom,
+  agents: Array<{ name: string; address: `0x${string}` }>
+): Promise<void> {
+  const messages: Record<string, string[]> = {
+    discussion: [
+      "I've been watching everyone carefully. Something feels off.",
+      "My scan results are interesting. Let me share what I found.",
+      "That's a bold claim. Can anyone verify?",
+      "The impostor is trying to blend in. Look at who's deflecting!",
+      "I trust the evidence. Let's vote based on facts, not feelings.",
+      "Hmm, that defense seems rehearsed. Suspicious.",
+      "I investigated and found something worth discussing.",
+      "We need to work together or the impostor wins.",
+      "Who hasn't spoken up yet? Silence is suspicious.",
+      "Let's cross-reference our scan results before voting.",
+    ],
+  };
+
+  // Send discussion messages
+  const alive = agents.filter((a) =>
+    room.isPlayerAlive(a.address)
+  );
+
+  for (const agent of alive) {
+    const msg = messages.discussion[Math.floor(Math.random() * messages.discussion.length)];
+    room.submitMessage(agent.address, msg);
+    await new Promise((r) => setTimeout(r, 800));
+  }
+
+  // Do some investigations
+  for (const agent of alive.slice(0, 3)) {
+    const targets = alive.filter((a) => a.address !== agent.address);
+    const target = targets[Math.floor(Math.random() * targets.length)];
+    room.investigate(agent.address, target.address);
+    await new Promise((r) => setTimeout(r, 500));
+  }
+}
 
 // ──────────────────────────────────────────
 // GET /api/stats - Engine stats

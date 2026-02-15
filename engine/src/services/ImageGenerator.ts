@@ -111,7 +111,7 @@ function generatePlaceholderSvg(text: string): string {
   <rect width="512" height="512" fill="url(#bg)" rx="32"/>
   <text x="256" y="200" text-anchor="middle" fill="white" font-size="100" font-family="Arial">🦞</text>
   <text x="256" y="340" text-anchor="middle" fill="white" font-size="28" font-family="Arial, sans-serif" font-weight="bold">${escapeXml(text.slice(0, 30))}</text>
-  <text x="256" y="400" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-size="20" font-family="Arial, sans-serif">Among Claws</text>
+  <text x="256" y="400" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-size="20" font-family="Arial, sans-serif">Claw Wars</text>
 </svg>`;
   const base64 = Buffer.from(svg, "utf-8").toString("base64");
   return `data:image/svg+xml;base64,${base64}`;
@@ -204,7 +204,7 @@ export async function generateGameBanner(
   playerCount: number,
   stake: string
 ): Promise<GeneratedImage> {
-  const baseDesc = `A dramatic game announcement banner for "Among Claws" - a social deduction game with lobster characters. ${playerCount} lobster players gather on a futuristic underwater space station. Stake: ${stake}. The mood is tense and exciting. Wide cinematic format.`;
+  const baseDesc = `A dramatic game announcement banner for "Claw Wars" - a social deduction game with lobster characters. ${playerCount} lobster players gather on a futuristic underwater space station. Stake: ${stake}. The mood is tense and exciting. Wide cinematic format.`;
 
   imageLogger.info(`Generating game banner for ${gameId}`);
 
@@ -296,7 +296,7 @@ export async function generateMoltbookPostImage(
   // Truncate content to avoid overly long prompts
   const truncated = content.length > 300 ? content.slice(0, 300) + "..." : content;
 
-  const baseDesc = `An illustration for a social media post about the "Among Claws" lobster social-deduction game. The post says: "${truncated}". Create a fitting, eye-catching illustration with lobster characters.`;
+  const baseDesc = `An illustration for a social media post about the "Claw Wars" lobster social-deduction game. The post says: "${truncated}". Create a fitting, eye-catching illustration with lobster characters.`;
 
   imageLogger.info("Generating Moltbook post image");
 

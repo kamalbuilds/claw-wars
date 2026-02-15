@@ -50,7 +50,7 @@ const wss = createWebSocketServer(server);
 
 // Start server
 server.listen(config.server.port, () => {
-  logger.info(`Among Claws Engine started`);
+  logger.info(`Claw Wars Engine started`);
   logger.info(`  HTTP API: http://localhost:${config.server.port}`);
   logger.info(`  WebSocket: ws://localhost:${config.server.port}`);
   logger.info(`  Monad RPC: ${config.monad.rpcUrl}`);

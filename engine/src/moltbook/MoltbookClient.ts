@@ -6,6 +6,7 @@ const moltbookLogger = logger.child("Moltbook");
 interface MoltbookPost {
   id: string;
   content: string;
+  title?: string;
   submolt?: string;
   author: string;
   createdAt: string;
@@ -18,6 +19,18 @@ interface MoltbookComment {
   content: string;
   author: string;
   createdAt: string;
+}
+
+interface MoltbookCreateResponse {
+  success: boolean;
+  post: MoltbookPost;
+  verification_required?: boolean;
+  verification?: {
+    code: string;
+    challenge: string;
+    expires_at: string;
+    instructions: string;
+  };
 }
 
 interface QueuedRequest {
@@ -124,22 +137,117 @@ class MoltbookClient {
 
     return this.enqueue(async () => {
       try {
-        const body: Record<string, unknown> = { content };
+        // API requires title + content + submolt
+        const title = content.slice(0, 100).replace(/\n/g, " ");
+        const body: Record<string, unknown> = { title, content };
         if (submolt) body.submolt = submolt;
 
-        const post = await this.request<MoltbookPost>(
+        const resp = await this.request<MoltbookCreateResponse>(
           "POST",
           "/posts",
           body
         );
         this.lastPostTime = Date.now();
-        moltbookLogger.info(`Post created: ${post.id}`);
-        return post;
+
+        // Handle verification challenge if required
+        if (resp.verification_required && resp.verification) {
+          await this.solveVerification(resp.verification.code, resp.verification.challenge);
+        }
+
+        moltbookLogger.info(`Post created: ${resp.post.id}`);
+        return resp.post;
       } catch (err) {
         moltbookLogger.error("Failed to create post", err);
         return null;
       }
     });
+  }
+
+  /**
+   * Solve Moltbook's math verification challenge.
+   * Challenges are formatted like: "A] LoB-sTeR ]ClA-w^ FoRcE ]Is/ fOrTy ]NeW-ToNs..."
+   * Extract the numbers, perform the operation, and POST the answer.
+   */
+  private async solveVerification(code: string, challenge: string): Promise<void> {
+    try {
+      // Normalize the challenge text: remove decoration, lowercase
+      const cleaned = challenge
+        .replace(/[\]\[^/~<+\-]/g, " ")
+        .replace(/[A-Z]/g, (c) => c.toLowerCase())
+        .replace(/\s+/g, " ")
+        .trim();
+
+      moltbookLogger.debug(`Verification challenge (cleaned): ${cleaned}`);
+
+      // Extract numbers from word form
+      const wordToNum: Record<string, number> = {
+        zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5,
+        six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+        eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15,
+        sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19,
+        twenty: 20, thirty: 30, forty: 40, fifty: 50,
+        sixty: 60, seventy: 70, eighty: 80, ninety: 90,
+        hundred: 100, thousand: 1000,
+      };
+
+      // Parse compound numbers like "forty newtons" or "twenty four newtons"
+      const numbers: number[] = [];
+      const words = cleaned.split(" ");
+      let current = 0;
+      let hasNumber = false;
+
+      for (const word of words) {
+        const clean = word.replace(/[^a-z]/g, "");
+        if (wordToNum[clean] !== undefined) {
+          const val = wordToNum[clean];
+          if (val === 100) {
+            current = (current || 1) * 100;
+          } else if (val === 1000) {
+            current = (current || 1) * 1000;
+          } else if (val >= 20 && val <= 90 && val % 10 === 0) {
+            current += val;
+          } else {
+            current += val;
+          }
+          hasNumber = true;
+        } else if (hasNumber && (clean === "newtons" || clean === "neutons" || clean === "meters" || clean === "kilograms" || clean === "seconds" || clean === "grams")) {
+          numbers.push(current);
+          current = 0;
+          hasNumber = false;
+        } else if (/^\d+(\.\d+)?$/.test(clean)) {
+          current += parseFloat(clean);
+          hasNumber = true;
+        }
+      }
+      if (hasNumber) numbers.push(current);
+
+      // Determine operation from challenge text
+      let answer = 0;
+      if (cleaned.includes("total") || cleaned.includes("sum") || cleaned.includes("combined") || cleaned.includes("together")) {
+        answer = numbers.reduce((a, b) => a + b, 0);
+      } else if (cleaned.includes("difference") || cleaned.includes("subtract") || cleaned.includes("minus")) {
+        answer = numbers.length >= 2 ? numbers[0] - numbers[1] : numbers[0];
+      } else if (cleaned.includes("product") || cleaned.includes("multiply") || cleaned.includes("times")) {
+        answer = numbers.reduce((a, b) => a * b, 1);
+      } else if (cleaned.includes("divide") || cleaned.includes("ratio") || cleaned.includes("quotient")) {
+        answer = numbers.length >= 2 ? numbers[0] / numbers[1] : numbers[0];
+      } else {
+        // Default: addition (most common)
+        answer = numbers.reduce((a, b) => a + b, 0);
+      }
+
+      const answerStr = answer.toFixed(2);
+      moltbookLogger.debug(`Verification answer: ${answerStr} (numbers found: ${numbers})`);
+
+      await this.request("POST", "/verify", {
+        verification_code: code,
+        answer: answerStr,
+      });
+
+      moltbookLogger.info("Verification solved successfully");
+    } catch (err) {
+      moltbookLogger.warn("Verification failed (post may remain pending)", err instanceof Error ? err.message : "");
+    }
   }
 
   async createComment(

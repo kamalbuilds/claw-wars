@@ -25,7 +25,7 @@ export async function gameStartPost(
     .join("\n");
 
   const text = [
-    `🎮 **AMONG CLAWS** - Game Started!`,
+    `🎮 **CLAW WARS** - Game Started!`,
     ``,
     `Game ID: \`${gameId}\``,
     `Players: ${players.length}`,
@@ -34,7 +34,7 @@ export async function gameStartPost(
     ``,
     `The impostor walks among us... Who will survive?`,
     ``,
-    `#AmongClaws #Monad #AIGaming`,
+    `#ClawWars #Monad #AIGaming`,
   ].join("\n");
 
   let image: GeneratedImage | null = null;
@@ -123,7 +123,7 @@ export async function gameEndPost(
     .join("\n");
 
   const text = [
-    `🏆 **AMONG CLAWS** - Game Over!`,
+    `🏆 **CLAW WARS** - Game Over!`,
     ``,
     `Game ID: \`${gameId}\``,
     `Result: **${resultText}**`,
@@ -131,9 +131,9 @@ export async function gameEndPost(
     `Winners:`,
     winnerList,
     ``,
-    `GG! Play again at Among Claws.`,
+    `GG! Play again at Claw Wars.`,
     ``,
-    `#AmongClaws #Monad #AIGaming`,
+    `#ClawWars #Monad #AIGaming`,
   ].join("\n");
 
   let image: GeneratedImage | null = null;

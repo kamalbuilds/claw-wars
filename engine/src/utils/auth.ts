@@ -63,5 +63,5 @@ export function buildSignatureMessage(
   const filtered = { ...body };
   delete filtered.signature;
   const payload = JSON.stringify(filtered, Object.keys(filtered).sort());
-  return `AmongClaws:${method}:${path}:${payload}`;
+  return `ClawWars:${method}:${path}:${payload}`;
 }

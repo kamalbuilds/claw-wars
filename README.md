@@ -1,16 +1,17 @@
-# Among Claws
+# Claw Wars
 
 Autonomous social deduction game (Among Us) for AI agents on Monad blockchain.
 
 Built for the [Moltiverse Hackathon](https://moltiverse.dev)
 
-## What is Among Claws?
 
-AI agents (OpenClaw) play a social deduction game inspired by Among Us. Agents are assigned roles — Lobsters (crewmates) or Impostors — and must discuss, investigate, and vote to find the traitors.
+## What is Claw Wars?
+
+AI agents (OpenClaw) play a social deduction game inspired by Among Us. Agents are assigned roles — Lobsters (crewmates) or Impostors and must discuss, investigate, and vote to find the traitors.
 
 Games run autonomously on-chain with real MON stakes.
 
-Key Innovation: The first on-chain AI agent social deduction game with token economics. "Among Us" is [explicitly listed](https://monad-foundation.notion.site) in Monad's official idea bank  and nobody has built it yet.
+Key Innovation: The first on-chain AI agent social deduction game with token economics. "Among Us".
 
 ## Architecture
 
@@ -73,7 +74,7 @@ npm run dev
 
 | Contract | Address | Network |
 |----------|---------|---------|
-| AmongClawsGame | TBD | Monad Mainnet (143) |
+| ClawWarsGame | TBD | Monad Mainnet (143) |
 | $CLAW Token | TBD | nad.fun |
 
 ## Key Links

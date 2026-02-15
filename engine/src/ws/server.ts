@@ -77,7 +77,7 @@ export function createWebSocketServer(server: HttpServer): WebSocketServer {
     sendToClient(client, {
       type: "connected",
       clientId,
-      message: "Welcome to Among Claws",
+      message: "Welcome to Claw Wars",
     });
   });
 
@@ -128,11 +128,10 @@ function handleClientMessage(
       const room = gameManager.getGame(gameId);
       if (room) {
         room.addSpectator(client.id);
-        // Send current game state
+        // Send current game state (wrapped in `data` for frontend)
         sendToClient(client, {
           type: "game_state",
-          gameId,
-          state: room.getState(),
+          data: room.getState(),
         });
       }
 
@@ -213,19 +212,14 @@ export function wireGameEvents(room: GameRoom): void {
   room.on("phaseChange", (_gId: string, phase: string, duration: number, round: number) => {
     broadcastToGame(gameId, {
       type: "phase_change",
-      gameId,
-      phase,
-      duration,
-      round,
-      timestamp: Date.now(),
+      data: { phase, timeRemaining: duration, duration, round },
     });
   });
 
   room.on("message", (_gId: string, message: GameMessage) => {
     broadcastToGame(gameId, {
       type: "message",
-      gameId,
-      message: {
+      data: {
         id: message.id,
         sender: message.sender,
         senderName: message.senderName,
@@ -233,7 +227,6 @@ export function wireGameEvents(room: GameRoom): void {
         timestamp: message.timestamp,
         round: message.round,
       },
-      timestamp: Date.now(),
     });
   });
 
@@ -247,13 +240,13 @@ export function wireGameEvents(room: GameRoom): void {
       targetName: string
     ) => {
       broadcastToGame(gameId, {
-        type: "vote_cast",
-        gameId,
-        voter: voterAddress,
-        voterName,
-        target: targetAddress,
-        targetName,
-        timestamp: Date.now(),
+        type: "vote",
+        data: {
+          voter: voterAddress,
+          voterName,
+          target: targetAddress,
+          targetName,
+        },
       });
     }
   );
@@ -269,10 +262,7 @@ export function wireGameEvents(room: GameRoom): void {
     ) => {
       broadcastToGame(gameId, {
         type: "elimination",
-        gameId,
-        eliminated: { address, name, role },
-        round,
-        timestamp: Date.now(),
+        data: { player: address, name, role, round },
       });
     }
   );
@@ -280,9 +270,7 @@ export function wireGameEvents(room: GameRoom): void {
   room.on("noElimination", (_gId: string, round: number) => {
     broadcastToGame(gameId, {
       type: "no_elimination",
-      gameId,
-      round,
-      timestamp: Date.now(),
+      data: { round },
     });
   });
 
@@ -291,13 +279,13 @@ export function wireGameEvents(room: GameRoom): void {
     (_gId: string, result: GameResult, winners: `0x${string}`[]) => {
       broadcastToGame(gameId, {
         type: "game_end",
-        gameId,
-        result:
-          result === GameResult.CrewmatesWin
-            ? "CrewmatesWin"
-            : "ImpostorWins",
-        winners,
-        timestamp: Date.now(),
+        data: {
+          winner:
+            result === GameResult.CrewmatesWin
+              ? "lobsters"
+              : "impostor",
+          winners,
+        },
       });
     }
   );
@@ -307,10 +295,10 @@ export function wireGameEvents(room: GameRoom): void {
     (_gId: string, address: `0x${string}`, name: string) => {
       broadcastToGame(gameId, {
         type: "player_joined",
-        gameId,
-        player: { address, name },
-        playerCount: room.getPlayerCount(),
-        timestamp: Date.now(),
+        data: {
+          player: { address, name },
+          playerCount: room.getPlayerCount(),
+        },
       });
     }
   );
@@ -329,9 +317,7 @@ export function wireGameEvents(room: GameRoom): void {
     ) => {
       broadcastToGame(gameId, {
         type: "investigation",
-        gameId,
-        ...data,
-        timestamp: Date.now(),
+        data,
       });
     }
   );

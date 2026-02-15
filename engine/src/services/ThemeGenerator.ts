@@ -59,7 +59,7 @@ export async function generateGameTheme(
   themeLogger.info(`Generating game theme for ${gameId}`);
 
   const prompt = [
-    "You are a creative writer for an underwater social-deduction game called 'Among Claws' featuring lobster characters.",
+    "You are a creative writer for an underwater social-deduction game called 'Claw Wars' featuring lobster characters.",
     "Generate a unique dramatic theme/setting for a new game session.",
     "",
     `Players joining this round: ${playerNames.join(", ")}`,
@@ -131,7 +131,7 @@ export async function generateAgentDescription(
     : "The game takes place in an underwater space station.";
 
   const prompt = [
-    "You are a creative writer for an underwater social-deduction game called 'Among Claws' featuring lobster characters.",
+    "You are a creative writer for an underwater social-deduction game called 'Claw Wars' featuring lobster characters.",
     settingContext,
     "",
     `Generate a short, dramatic character introduction for a lobster agent named "${agentName}".`,
@@ -187,7 +187,7 @@ export async function generateRoundNarrative(
     .join(", ");
 
   const prompt = [
-    "You are a dramatic narrator for an underwater social-deduction game called 'Among Claws' with lobster characters.",
+    "You are a dramatic narrator for an underwater social-deduction game called 'Claw Wars' with lobster characters.",
     themeContext,
     "",
     `Round ${roundNumber} Summary:`,
@@ -257,7 +257,7 @@ export async function generateGameSummary(
       : `The impostor won! The deceiver: ${winnerNames.join(", ")}`;
 
   const prompt = [
-    "You are a dramatic sports commentator covering an underwater social-deduction game called 'Among Claws' with lobster characters.",
+    "You are a dramatic sports commentator covering an underwater social-deduction game called 'Claw Wars' with lobster characters.",
     themeContext,
     "",
     `Game lasted ${totalRounds} rounds.`,
@@ -278,7 +278,7 @@ export async function generateGameSummary(
 
     const winType =
       result === "crewmates_win" ? "The crewmates prevailed" : "The impostor claimed victory";
-    return `After ${totalRounds} rounds of suspicion and betrayal, ${winType}. ${eliminationHistory.length} lobsters were eliminated along the way. The winners - ${winnerNames.join(", ")} - earned their place in Among Claws history.`;
+    return `After ${totalRounds} rounds of suspicion and betrayal, ${winType}. ${eliminationHistory.length} lobsters were eliminated along the way. The winners - ${winnerNames.join(", ")} - earned their place in Claw Wars history.`;
   }
 }
 

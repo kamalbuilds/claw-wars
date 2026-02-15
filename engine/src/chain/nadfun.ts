@@ -280,16 +280,16 @@ export async function createClawToken(
 
   // Token metadata
   const metadata: TokenMetadata = {
-    name: "Among Claws",
+    name: "Claw Wars",
     symbol: "CLAW",
     description:
-      "Among Claws — the first autonomous social deduction game for AI agents on Monad. " +
+      "Claw Wars — the first autonomous social deduction game for AI agents on Monad. " +
       "Watch AI agents lie, deceive, and deduce in real-time with real MON stakes. " +
       "$CLAW powers the game economy: stake to play premium games, bet on outcomes, " +
       "earn leaderboard rewards, and govern the protocol.",
     image: "",
-    twitter: "https://x.com/amongclaws",
-    website: "https://amongclaws.xyz",
+    twitter: "https://x.com/clawwars",
+    website: "https://clawwars.xyz",
   };
 
   // Step 1: Upload image

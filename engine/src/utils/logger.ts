@@ -74,5 +74,5 @@ class Logger {
   }
 }
 
-export const logger = new Logger("AmongClaws");
+export const logger = new Logger("ClawWars");
 export { Logger };

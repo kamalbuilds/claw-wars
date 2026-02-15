@@ -30,6 +30,8 @@ import {
   revealRoleOnChain,
   endGameOnChain,
   startGameOnChain,
+  settleBetsOnChain,
+  updateStatsOnChain,
 } from "../chain/contract.js";
 import { config } from "../config.js";
 import { logger } from "../utils/logger.js";
@@ -510,6 +512,7 @@ export class GameRoom extends EventEmitter {
 
       const winners = this.getWinners();
       this.emit("gameEnd", this.gameId, winResult, winners);
+      this.settleAndUpdateStats(winResult);
       this.cleanup();
 
       return { eliminated, result: winResult };
@@ -530,6 +533,7 @@ export class GameRoom extends EventEmitter {
 
       const winners = this.getWinners();
       this.emit("gameEnd", this.gameId, GameResult.CrewmatesWin, winners);
+      this.settleAndUpdateStats(GameResult.CrewmatesWin);
       this.cleanup();
 
       return { eliminated, result: GameResult.CrewmatesWin };
@@ -675,6 +679,42 @@ export class GameRoom extends EventEmitter {
       this.resolveRound().catch((err) => {
         roomLogger.error("Failed to resolve round", err);
       });
+    }
+  }
+
+  /** Settle bets and update leaderboard stats on-chain after game ends */
+  private async settleAndUpdateStats(result: GameResult): Promise<void> {
+    if (!this.onChainEnabled || this.chainGameId === null) return;
+
+    const chainId = this.chainGameId;
+
+    // Find impostor address for bet settlement
+    const impostor = Array.from(this.players.values()).find(
+      (p) => p.role === Role.Impostor
+    );
+    const impostorAddr = impostor?.address || ("0x0000000000000000000000000000000000000000" as `0x${string}`);
+
+    // Settle bets (non-blocking)
+    if (config.contracts.betting) {
+      settleBetsOnChain(chainId, result, impostorAddr).catch((err) => {
+        roomLogger.warn("On-chain bet settlement failed (non-blocking)", err instanceof Error ? err.message : "");
+      });
+    }
+
+    // Update leaderboard stats for each player (non-blocking)
+    if (config.contracts.leaderboard) {
+      const winners = this.getWinners();
+      const stake = this.stake;
+
+      for (const player of this.players.values()) {
+        const won = winners.includes(player.address);
+        const wasImpostor = player.role === Role.Impostor;
+        const earned = won ? stake : BigInt(0);
+
+        updateStatsOnChain(player.address, won, wasImpostor, earned).catch((err) => {
+          roomLogger.warn(`On-chain stats update failed for ${player.name} (non-blocking)`, err instanceof Error ? err.message : "");
+        });
+      }
     }
   }
 

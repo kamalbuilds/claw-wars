@@ -28,26 +28,21 @@ class GameManager {
 
     let chainGameId: bigint | undefined;
 
-    // Create game on-chain if enabled
+    // Create game on-chain if enabled (non-blocking to avoid request timeouts)
     if (onChainEnabled && config.contracts.game) {
-      try {
-        const txHash = await createGameOnChain(
-          stake,
-          minPlayers,
-          maxPlayers,
-          impostorCount,
-          maxRounds
-        );
+      chainGameId = BigInt(Date.now());
+      // Fire-and-forget: don't block game creation on chain TX
+      createGameOnChain(
+        stake,
+        minPlayers,
+        maxPlayers,
+        impostorCount,
+        maxRounds
+      ).then((txHash) => {
         managerLogger.info(`Game created on-chain: ${txHash}`);
-        // In production, parse the GameCreated event to get the actual game ID
-        // For now, use a counter-based approach
-        chainGameId = BigInt(Date.now());
-      } catch (err) {
-        managerLogger.error("Failed to create game on-chain", err);
-        if (onChainEnabled) {
-          managerLogger.warn("Continuing with off-chain game");
-        }
-      }
+      }).catch((err) => {
+        managerLogger.warn("On-chain game creation failed (non-blocking)", err instanceof Error ? err.message : String(err));
+      });
     }
 
     const room = new GameRoom({
