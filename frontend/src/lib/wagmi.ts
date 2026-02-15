@@ -24,7 +24,7 @@ export const monadTestnet = defineChain({
 });
 
 export const config = getDefaultConfig({
-  appName: "Among Claws",
+  appName: "Claw Wars",
   projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || "demo",
   chains: [monadTestnet],
   ssr: true,

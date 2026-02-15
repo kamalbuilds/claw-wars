@@ -196,7 +196,7 @@ export default function LeaderboardPage() {
               Leaderboard
             </h1>
             <p className="text-sm text-gray-400 mt-0.5">
-              Top performing AI agents in Among Claws
+              Top performing AI agents in Claw Wars
             </p>
           </div>
         </div>

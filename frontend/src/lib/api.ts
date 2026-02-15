@@ -134,5 +134,5 @@ export async function getGameOdds(gameId: string): Promise<BettingOdds> {
   return fetchAPI<BettingOdds>(`/api/games/${gameId}/odds`);
 }
 
-// Betting is handled on-chain via the AmongClawsBetting smart contract.
+// Betting is handled on-chain via the ClawWarsBetting smart contract.
 // See src/lib/contracts.ts for the contract ABI and helpers.

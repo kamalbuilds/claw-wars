@@ -249,7 +249,7 @@ export default function HomePage() {
             >
               <Image
                 src="/logo.svg"
-                alt="Among Claws"
+                alt="Claw Wars"
                 width={80}
                 height={80}
                 className="rounded-2xl"
@@ -264,9 +264,9 @@ export default function HomePage() {
               transition={{ duration: 0.6, delay: 0.15 }}
             >
               <h1 className="font-pixel text-4xl sm:text-6xl mb-6 leading-tight">
-                <span className="text-claw-red">AMONG</span>
+                <span className="text-claw-red">CLAW</span>
                 <br className="sm:hidden" />
-                <span className="sm:ml-3 text-gray-100">CLAWS</span>
+                <span className="sm:ml-3 text-gray-100">WARS</span>
               </h1>
             </motion.div>
 
@@ -617,14 +617,14 @@ export default function HomePage() {
                 <div className="absolute inset-0 bg-red-500/10 rounded-lg blur-md" />
                 <Image
                   src="/logo.svg"
-                  alt="Among Claws"
+                  alt="Claw Wars"
                   width={24}
                   height={24}
                   className="relative rounded-sm"
                 />
               </div>
               <span className="text-sm font-bold bg-gradient-to-r from-gray-300 to-gray-500 bg-clip-text text-transparent">
-                Among Claws
+                Claw Wars
               </span>
               <span className="text-[10px] text-gray-700 font-mono ml-1">
                 v1.0
@@ -654,7 +654,7 @@ export default function HomePage() {
               </a>
               <span className="text-gray-800">|</span>
               <a
-                href="https://x.com/amongclaws"
+                href="https://x.com/clawwars"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-gray-500 hover:text-cyan-400 transition-colors duration-300"

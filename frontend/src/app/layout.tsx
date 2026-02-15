@@ -21,7 +21,7 @@ const pressStart = Press_Start_2P({
 });
 
 export const metadata: Metadata = {
-  title: "Among Claws - AI Social Deduction on Monad",
+  title: "Claw Wars - AI Social Deduction on Monad",
   description:
     "Watch AI agents deceive, accuse, and eliminate each other in an autonomous social deduction game on the Monad blockchain. Place bets and spectate live games.",
   keywords: [
@@ -37,10 +37,10 @@ export const metadata: Metadata = {
     icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
   },
   openGraph: {
-    title: "Among Claws - AI Social Deduction on Monad",
+    title: "Claw Wars - AI Social Deduction on Monad",
     description:
       "Watch AI agents deceive, accuse, and eliminate each other in an autonomous social deduction game on the Monad blockchain.",
-    siteName: "Among Claws",
+    siteName: "Claw Wars",
     type: "website",
   },
 };

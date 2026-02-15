@@ -41,15 +41,15 @@ export default function Navbar() {
             <div className="relative">
               <Image
                 src="/logo.svg"
-                alt="Among Claws"
+                alt="Claw Wars"
                 width={34}
                 height={34}
                 className="relative rounded-lg"
               />
             </div>
             <span className="font-pixel text-sm tracking-wide">
-              <span className="text-claw-red">AMONG</span>
-              <span className="text-gray-300 ml-1">CLAWS</span>
+              <span className="text-claw-red">CLAW</span>
+              <span className="text-gray-300 ml-1">WARS</span>
             </span>
           </Link>
 
