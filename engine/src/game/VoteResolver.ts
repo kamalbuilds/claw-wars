@@ -2,14 +2,22 @@ import { logger } from "../utils/logger.js";
 
 const voteLogger = logger.child("VoteResolver");
 
-interface VoteRecord {
+export interface VoteRecord {
   voter: `0x${string}`;
   target: `0x${string}`;
   timestamp: number;
 }
 
-// gameId -> list of votes
+export interface RoundVoteHistory {
+  round: number;
+  votes: VoteRecord[];
+  eliminated: `0x${string}` | null;
+}
+
+// gameId -> list of votes (current round)
 const voteStorage = new Map<string, VoteRecord[]>();
+// gameId -> archived vote history per round
+const voteHistory = new Map<string, RoundVoteHistory[]>();
 
 export function recordVote(
   gameId: string,
@@ -60,12 +68,13 @@ export function resolveVotes(gameId: string): `0x${string}` | null {
     }
   }
 
-  // If tie, no elimination
+  // If tie, randomly pick one of the tied leaders (tiebreaker)
   if (maxTargets.length > 1) {
+    const picked = maxTargets[Math.floor(Math.random() * maxTargets.length)];
     voteLogger.info(
-      `Vote tie in game ${gameId} between ${maxTargets.join(", ")} with ${maxVotes} votes each`
+      `Vote tie in game ${gameId} between ${maxTargets.length} players with ${maxVotes} votes each — tiebreaker eliminates ${picked}`
     );
-    return null;
+    return picked;
   }
 
   const eliminated = maxTargets[0];
@@ -92,6 +101,29 @@ export function getVoteRecords(gameId: string): VoteRecord[] {
   return voteStorage.get(gameId) || [];
 }
 
+/** Archive current round's votes before resetting. Call this after resolveVotes. */
+export function archiveRoundVotes(
+  gameId: string,
+  round: number,
+  eliminated: `0x${string}` | null
+): void {
+  const currentVotes = voteStorage.get(gameId) || [];
+  if (!voteHistory.has(gameId)) {
+    voteHistory.set(gameId, []);
+  }
+  voteHistory.get(gameId)!.push({
+    round,
+    votes: [...currentVotes],
+    eliminated,
+  });
+  voteLogger.info(`Archived ${currentVotes.length} votes for game ${gameId} round ${round}`);
+}
+
+/** Get full vote history for all completed rounds */
+export function getVoteHistory(gameId: string): RoundVoteHistory[] {
+  return voteHistory.get(gameId) || [];
+}
+
 export function resetVotes(gameId: string): void {
   voteStorage.set(gameId, []);
   voteLogger.info(`Votes reset for game ${gameId}`);
@@ -99,4 +131,5 @@ export function resetVotes(gameId: string): void {
 
 export function cleanupVotes(gameId: string): void {
   voteStorage.delete(gameId);
+  // Keep vote history - don't delete it so spectators can review after game ends
 }

@@ -13,6 +13,8 @@ import {
   Crown,
   Skull,
   Shield,
+  X,
+  Vote,
 } from "lucide-react";
 import PlayerAvatar from "./PlayerAvatar";
 import PhaseTimer from "./PhaseTimer";
@@ -135,6 +137,7 @@ export default function GameViewer({
   const chatEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
+  const [showWinOverlay, setShowWinOverlay] = useState(true);
 
   // Auto-scroll chat within its container only (not the page)
   useEffect(() => {
@@ -180,13 +183,23 @@ export default function GameViewer({
 
       {/* ━━━━━━━━━━ WINNER OVERLAY ━━━━━━━━━━ */}
       <AnimatePresence>
-        {winner && (
+        {winner && showWinOverlay && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="absolute inset-0 z-50 flex items-center justify-center rounded-2xl overflow-hidden"
           >
+            {/* Dismiss button */}
+            <motion.button
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 1.2 }}
+              onClick={() => setShowWinOverlay(false)}
+              className="absolute top-4 right-4 z-[60] p-2 rounded-full glass-card border border-gray-600/30 text-gray-400 hover:text-white hover:border-gray-500/50 transition-all"
+            >
+              <X className="h-5 w-5" />
+            </motion.button>
             {/* Dark backdrop with pulsing color wash */}
             <motion.div
               className="absolute inset-0"
@@ -489,7 +502,7 @@ export default function GameViewer({
 
           {/* ─── Vote Tracker ─── */}
           <AnimatePresence>
-            {phase === "voting" && Object.keys(voteTally).length > 0 && (
+            {(phase === "voting" || phase === "elimination") && Object.keys(voteTally).length > 0 && (
               <motion.div
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: "auto", opacity: 1 }}
@@ -616,6 +629,121 @@ export default function GameViewer({
             )}
           </AnimatePresence>
 
+          {/* ─── Vote History (completed games) ─── */}
+          {gameState && gameState.voteHistory && gameState.voteHistory.length > 0 && (
+            <div className="rounded-2xl p-5 glass-card">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-pixel text-[10px] text-orange-400 flex items-center gap-2">
+                  <Vote className="h-4 w-4" />
+                  VOTE HISTORY
+                </h3>
+                <span className="text-[10px] text-gray-500 font-mono">
+                  {gameState.voteHistory.length} round{gameState.voteHistory.length > 1 ? "s" : ""}
+                </span>
+              </div>
+
+              <div className="space-y-3">
+                {gameState.voteHistory.map((roundHistory) => {
+                  // Build tally for this round
+                  const tally: Record<string, string[]> = {};
+                  for (const vote of roundHistory.votes) {
+                    const target = vote.target.toLowerCase();
+                    if (!tally[target]) tally[target] = [];
+                    tally[target].push(vote.voter);
+                  }
+                  const sortedTargets = Object.entries(tally).sort(
+                    (a, b) => b[1].length - a[1].length
+                  );
+                  const roundMax = Math.max(1, ...sortedTargets.map(([, v]) => v.length));
+
+                  // Find eliminated player name
+                  const eliminatedInfo = roundHistory.eliminated
+                    ? gameState.eliminations?.find(
+                        (e) => e.address.toLowerCase() === roundHistory.eliminated?.toLowerCase()
+                      )
+                    : null;
+
+                  return (
+                    <div key={roundHistory.round} className="rounded-xl border border-gray-800/50 overflow-hidden">
+                      {/* Round header */}
+                      <div className="flex items-center justify-between px-3.5 py-2 bg-gray-900/60 border-b border-gray-800/40">
+                        <span className="text-[10px] font-pixel text-gray-400 uppercase tracking-wider">
+                          Round {roundHistory.round}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-gray-500 font-mono">
+                            {roundHistory.votes.length} votes
+                          </span>
+                          {eliminatedInfo ? (
+                            <span className={cn(
+                              "text-[9px] font-bold px-2 py-0.5 rounded-full",
+                              eliminatedInfo.role === "Impostor"
+                                ? "text-purple-400 bg-purple-500/15"
+                                : "text-red-400 bg-red-500/15"
+                            )}>
+                              <Skull className="h-2.5 w-2.5 inline mr-1" />
+                              {eliminatedInfo.name}
+                              {eliminatedInfo.role === "Impostor" ? " (Impostor)" : ""}
+                            </span>
+                          ) : roundHistory.votes.length === 0 ? (
+                            <span className="text-[9px] text-gray-600 italic">no votes</span>
+                          ) : (
+                            <span className="text-[9px] text-yellow-500/80">tie broken</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Vote bars */}
+                      {sortedTargets.length > 0 ? (
+                        <div className="p-2.5 space-y-1.5">
+                          {sortedTargets.map(([target, voters]) => {
+                            const targetPlayer = players.find(
+                              (p) => p.address.toLowerCase() === target
+                            );
+                            const targetColor = getAgentColor(target);
+                            const pct = (voters.length / roundMax) * 100;
+                            const isEliminated = roundHistory.eliminated?.toLowerCase() === target;
+
+                            return (
+                              <div key={target} className="relative rounded-lg overflow-hidden bg-gray-900/30">
+                                <div
+                                  className="absolute inset-y-0 left-0 rounded-lg transition-all"
+                                  style={{
+                                    width: `${pct}%`,
+                                    background: `linear-gradient(90deg, ${targetColor}18, ${targetColor}08)`,
+                                    borderRight: `2px solid ${targetColor}40`,
+                                  }}
+                                />
+                                <div className="relative flex items-center gap-2 px-3 py-1.5">
+                                  <span className="text-xs font-medium text-gray-300 truncate flex-1">
+                                    {targetPlayer?.name || `${target.slice(0, 6)}...${target.slice(-4)}`}
+                                  </span>
+                                  {isEliminated && (
+                                    <Skull className="h-3 w-3 text-red-400 shrink-0" />
+                                  )}
+                                  <span
+                                    className="text-xs font-bold tabular-nums shrink-0"
+                                    style={{ color: targetColor }}
+                                  >
+                                    {voters.length}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="p-3 text-center text-xs text-gray-600">
+                          No votes cast this round
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* ─── Discussion Feed ─── */}
           <div
             className="rounded-2xl overflow-hidden glass-card"
@@ -665,9 +793,35 @@ export default function GameViewer({
                   </p>
                 </div>
               ) : (
-                messages.map((msg, i) => (
-                  <DiscussionMessage key={msg.id} message={msg} index={i} />
-                ))
+                (() => {
+                  // Group messages by round
+                  const rounds = new Map<number, typeof messages>();
+                  let globalIdx = 0;
+                  messages.forEach((msg) => {
+                    const r = msg.round ?? 1;
+                    if (!rounds.has(r)) rounds.set(r, []);
+                    rounds.get(r)!.push(msg);
+                  });
+                  const sortedRounds = Array.from(rounds.entries()).sort((a, b) => a[0] - b[0]);
+
+                  return sortedRounds.map(([round, msgs]) => (
+                    <div key={`round-${round}`}>
+                      {sortedRounds.length > 1 && (
+                        <div className="flex items-center gap-2 py-2 px-1">
+                          <div className="flex-1 h-px bg-gray-700/50" />
+                          <span className="text-[10px] font-pixel text-gray-500 uppercase tracking-wider">
+                            Round {round}
+                          </span>
+                          <div className="flex-1 h-px bg-gray-700/50" />
+                        </div>
+                      )}
+                      {msgs.map((msg) => {
+                        const idx = globalIdx++;
+                        return <DiscussionMessage key={msg.id} message={msg} index={idx} />;
+                      })}
+                    </div>
+                  ));
+                })()
               )}
               <div ref={chatEndRef} />
             </div>

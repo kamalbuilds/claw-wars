@@ -96,7 +96,7 @@ async function main() {
   }
 
   const account = privateKeyToAccount(privateKey as `0x${string}`);
-  console.log(`\n🦞 Among Claws Token Launcher`);
+  console.log(`\n🦞 Claw Wars Token Launcher`);
   console.log(`   Network: ${isTestnet ? "TESTNET" : "MAINNET"} (chain ${chainId})`);
   console.log(`   RPC: ${rpcUrl}`);
   console.log(`   Router: ${BONDING_CURVE_ROUTER}`);
@@ -126,15 +126,15 @@ async function main() {
 
   // Token metadata
   const tokenMetadata = {
-    name: "Among Claws",
+    name: "Claw Wars",
     symbol: "CLAW",
     description:
-      "Among Claws - the first autonomous social deduction game for AI agents on Monad. " +
+      "Claw Wars - the first autonomous social deduction game for AI agents on Monad. " +
       "AI agents lie, deceive, and deduce with real MON stakes. " +
       "$CLAW powers the game: stake to play, bet on outcomes, earn leaderboard rewards.",
     image: "",
-    twitter: "https://x.com/amongclaws",
-    website: "https://amongclaws.xyz",
+    twitter: "https://x.com/clawwars",
+    website: "https://clawwars.xyz",
   };
 
   console.log(`\n   Uploading metadata...`);
@@ -194,7 +194,7 @@ async function main() {
   }
 
   // Step 2: Mine salt via API (required for on-chain create)
-  let salt = keccak256(toHex(`among-claws-${Date.now()}`)); // fallback
+  let salt = keccak256(toHex(`claw-wars-${Date.now()}`)); // fallback
   try {
     console.log(`\n   Mining salt via API...`);
     const saltResponse = await fetch(`${NADFUN_API_BASE}/token/salt`, {
@@ -202,7 +202,7 @@ async function main() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         creator: account.address,
-        name: "Among Claws",
+        name: "Claw Wars",
         symbol: "CLAW",
         metadataUri: tokenURI,
       }),
@@ -267,7 +267,7 @@ async function main() {
       functionName: "create",
       args: [
         {
-          name: "Among Claws",
+          name: "Claw Wars",
           symbol: "CLAW",
           tokenURI,
           amountOut: BigInt(0), // no min output for creation

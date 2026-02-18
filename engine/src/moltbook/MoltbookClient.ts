@@ -170,16 +170,21 @@ class MoltbookClient {
    */
   private async solveVerification(code: string, challenge: string): Promise<void> {
     try {
-      // Normalize the challenge text: remove decoration, lowercase
-      const cleaned = challenge
-        .replace(/[\]\[^/~<+\-]/g, " ")
-        .replace(/[A-Z]/g, (c) => c.toLowerCase())
-        .replace(/\s+/g, " ")
-        .trim();
+      // Step 1: Strip ALL non-letter/space chars, lowercase, normalize spaces
+      let cleaned = challenge.replace(/[^a-zA-Z\s]/g, " ");
+      cleaned = cleaned.toLowerCase().replace(/\s+/g, " ").trim();
+
+      // Step 2: Rejoin split unit words (hyphens cause "new tons" → "newtons")
+      cleaned = cleaned
+        .replace(/\bnew tons\b/g, "newtons")
+        .replace(/\bneu tons\b/g, "neutons")
+        .replace(/\bkilo grams\b/g, "kilograms")
+        .replace(/\bmilli meters\b/g, "millimeters")
+        .replace(/\bcenti meters\b/g, "centimeters");
 
       moltbookLogger.debug(`Verification challenge (cleaned): ${cleaned}`);
 
-      // Extract numbers from word form
+      // Step 3: Extract numbers from word form
       const wordToNum: Record<string, number> = {
         zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5,
         six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
@@ -190,54 +195,83 @@ class MoltbookClient {
         hundred: 100, thousand: 1000,
       };
 
-      // Parse compound numbers like "forty newtons" or "twenty four newtons"
+      // Unit words that signal end of a number
+      const unitWords = new Set([
+        "newtons", "neutons", "newton", "meters", "meter",
+        "kilograms", "kilogram", "grams", "gram",
+        "seconds", "second", "joules", "joule",
+        "watts", "watt", "volts", "volt", "amps", "amp",
+        "hertz", "pascals", "pascal", "degrees", "degree",
+        "liters", "liter", "millimeters", "centimeters",
+        "tons", "ton", "pounds", "pound",
+      ]);
+
+      // Connector/filler words to skip (don't break number parsing)
+      const skipWords = new Set([
+        "a", "an", "the", "is", "are", "was", "has", "have", "of",
+        "and", "um", "uh", "another", "other", "with", "its",
+        "lobster", "claw", "force", "lob", "ster", "cla", "w",
+      ]);
+
       const numbers: number[] = [];
       const words = cleaned.split(" ");
       let current = 0;
       let hasNumber = false;
 
-      for (const word of words) {
-        const clean = word.replace(/[^a-z]/g, "");
+      for (let i = 0; i < words.length; i++) {
+        const clean = words[i].replace(/[^a-z0-9.]/g, "");
+        if (!clean) continue;
+
         if (wordToNum[clean] !== undefined) {
           const val = wordToNum[clean];
           if (val === 100) {
             current = (current || 1) * 100;
           } else if (val === 1000) {
             current = (current || 1) * 1000;
-          } else if (val >= 20 && val <= 90 && val % 10 === 0) {
-            current += val;
           } else {
             current += val;
           }
           hasNumber = true;
-        } else if (hasNumber && (clean === "newtons" || clean === "neutons" || clean === "meters" || clean === "kilograms" || clean === "seconds" || clean === "grams")) {
+        } else if (unitWords.has(clean)) {
+          // Unit word: finalize current number
+          if (hasNumber) {
+            numbers.push(current);
+            current = 0;
+            hasNumber = false;
+          }
+        } else if (/^\d+(\.\d+)?$/.test(clean)) {
+          // Numeric digit
+          current += parseFloat(clean);
+          hasNumber = true;
+        } else if (skipWords.has(clean)) {
+          // Skip filler words — don't break number accumulation
+          continue;
+        } else if (hasNumber) {
+          // Unknown word while accumulating — finalize number
           numbers.push(current);
           current = 0;
           hasNumber = false;
-        } else if (/^\d+(\.\d+)?$/.test(clean)) {
-          current += parseFloat(clean);
-          hasNumber = true;
         }
       }
       if (hasNumber) numbers.push(current);
 
-      // Determine operation from challenge text
+      // Step 4: Determine operation from challenge text
       let answer = 0;
-      if (cleaned.includes("total") || cleaned.includes("sum") || cleaned.includes("combined") || cleaned.includes("together")) {
+      if (cleaned.includes("total") || cleaned.includes("sum") || cleaned.includes("combined") || cleaned.includes("together") || cleaned.includes("add")) {
         answer = numbers.reduce((a, b) => a + b, 0);
-      } else if (cleaned.includes("difference") || cleaned.includes("subtract") || cleaned.includes("minus")) {
-        answer = numbers.length >= 2 ? numbers[0] - numbers[1] : numbers[0];
+      } else if (cleaned.includes("difference") || cleaned.includes("subtract") || cleaned.includes("minus") || cleaned.includes("less than")) {
+        answer = numbers.length >= 2 ? Math.abs(numbers[0] - numbers[1]) : numbers[0];
       } else if (cleaned.includes("product") || cleaned.includes("multiply") || cleaned.includes("times")) {
         answer = numbers.reduce((a, b) => a * b, 1);
       } else if (cleaned.includes("divide") || cleaned.includes("ratio") || cleaned.includes("quotient")) {
-        answer = numbers.length >= 2 ? numbers[0] / numbers[1] : numbers[0];
+        answer = numbers.length >= 2 && numbers[1] !== 0 ? numbers[0] / numbers[1] : numbers[0];
       } else {
-        // Default: addition (most common)
+        // Default: addition
         answer = numbers.reduce((a, b) => a + b, 0);
       }
 
       const answerStr = answer.toFixed(2);
-      moltbookLogger.debug(`Verification answer: ${answerStr} (numbers found: ${numbers})`);
+      moltbookLogger.info(`Verification: numbers=${JSON.stringify(numbers)}, answer=${answerStr}`);
 
       await this.request("POST", "/verify", {
         verification_code: code,

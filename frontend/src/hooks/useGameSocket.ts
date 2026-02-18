@@ -3,25 +3,29 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { GameState, ChatMessage, Player, GamePhase, WebSocketEvent } from "@/lib/types";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:3002";
 const RECONNECT_DELAY = 3000;
 const MAX_RECONNECT_ATTEMPTS = 10;
 const POLL_INTERVAL = 3000;
 
 function getWsUrl(gameId: string): string {
-  if (typeof window !== "undefined" && window.location.protocol === "https:") {
-    // On HTTPS, route through Next.js rewrite proxy to avoid mixed content
-    return `wss://${window.location.host}/ws?gameId=${gameId}`;
-  }
-  return `${WS_URL}?gameId=${gameId}`;
+  // Connect directly to the engine's WSS endpoint.
+  // Railway (and most hosts) provide WSS automatically on HTTPS domains.
+  // Next.js rewrites do NOT support WebSocket upgrades, so we must connect directly.
+  let base = WS_URL;
+  if (base.startsWith("http://")) base = base.replace("http://", "ws://");
+  if (base.startsWith("https://")) base = base.replace("https://", "wss://");
+  if (!base.startsWith("ws://") && !base.startsWith("wss://")) base = `wss://${base}`;
+  return `${base}?gameId=${gameId}`;
 }
 
 function getApiBase(): string {
+  // Use Next.js rewrite proxy for REST API calls (avoids CORS)
   if (typeof window !== "undefined" && window.location.protocol === "https:") {
     return "/engine";
   }
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-  return apiUrl;
+  return API_URL;
 }
 
 interface UseGameSocketReturn {
@@ -51,12 +55,20 @@ function normalizePhase(phase: unknown): GamePhase {
   return "lobby";
 }
 
+function normalizeRole(role: unknown): "lobster" | "impostor" | "unknown" {
+  if (typeof role !== "string") return "unknown";
+  const lower = role.toLowerCase();
+  if (lower === "impostor") return "impostor";
+  if (lower === "lobster" || lower === "crewmate") return "lobster";
+  return "unknown";
+}
+
 function normalizePlayers(raw: unknown[]): Player[] {
   if (!Array.isArray(raw)) return [];
   return raw.map((p: any) => ({
     address: p.address ?? "",
     name: p.name ?? "",
-    role: p.role ?? "unknown",
+    role: normalizeRole(p.role),
     isAlive: p.isAlive ?? p.alive ?? true,
     votedFor: p.votedFor ?? null,
     isSpeaking: p.isSpeaking ?? false,
@@ -72,12 +84,21 @@ function normalizeMessage(m: any): ChatMessage {
     timestamp: m.timestamp ?? Date.now(),
     type: m.type ?? "discussion",
     senderAlive: m.senderAlive ?? m.sender_alive ?? true,
+    round: m.round ?? undefined,
   };
 }
 
 function normalizeMessages(raw: unknown): ChatMessage[] {
   if (!Array.isArray(raw)) return [];
   return raw.map(normalizeMessage);
+}
+
+function deriveWinner(data: any): "lobsters" | "impostor" | null {
+  if (data.winner) return data.winner;
+  // Derive from engine's result field: 1=CrewmatesWin, 2=ImpostorWins
+  if (data.result === 1) return "lobsters";
+  if (data.result === 2) return "impostor";
+  return null;
 }
 
 function normalizeGameState(data: any, fallbackId: string): GameState {
@@ -87,12 +108,14 @@ function normalizeGameState(data: any, fallbackId: string): GameState {
     round: data.roundNumber ?? data.round ?? 1,
     players: normalizePlayers(data.players ?? []),
     messages: normalizeMessages(data.messages),
-    timeRemaining: data.timeRemaining ?? 0,
+    timeRemaining: data.timeRemaining ?? data.remainingTime ?? 0,
     totalStake: data.totalStake ?? "0",
     stakePerPlayer: data.stakePerPlayer ?? "0",
     maxPlayers: data.maxPlayers ?? 8,
     createdAt: data.createdAt ?? Date.now(),
-    winner: data.winner ?? null,
+    winner: deriveWinner(data),
+    voteHistory: Array.isArray(data.voteHistory) ? data.voteHistory : [],
+    eliminations: Array.isArray(data.eliminations) ? data.eliminations : [],
   };
 }
 
@@ -113,6 +136,7 @@ export function useGameSocket(gameId: string | null): UseGameSocketReturn {
   const pollInterval = useRef<NodeJS.Timeout | null>(null);
   const wsFailedRef = useRef(false);
   const serverTimeRef = useRef(0); // Track server-sent time to avoid jitter
+  const gotWsState = useRef(false); // Track if WS has delivered game_state
 
   // Set server time from external updates (WS or polling) without triggering timer jitter
   const updateServerTime = useCallback((newTime: number) => {
@@ -189,12 +213,21 @@ export function useGameSocket(gameId: string | null): UseGameSocketReturn {
               updateServerTime(normalized.timeRemaining);
               setMessages(normalized.messages);
               setWinner(normalized.winner);
+              gotWsState.current = true;
+              stopPolling(); // WS is delivering state, no need for polling
               break;
             }
 
             case "phase_change":
               setPhase(normalizePhase(wsEvent.data.phase));
               updateServerTime(wsEvent.data.timeRemaining ?? 0);
+              // Update round number if provided
+              if (wsEvent.data.round != null) {
+                const newRound = wsEvent.data.round;
+                setGameState((prev) =>
+                  prev ? { ...prev, phase: normalizePhase(wsEvent.data.phase), round: newRound } : prev
+                );
+              }
               break;
 
             case "message":
@@ -263,11 +296,9 @@ export function useGameSocket(gameId: string | null): UseGameSocketReturn {
       };
 
       ws.onerror = () => {
-        // Don't show error to user if we'll fall back to polling
-        if (reconnectAttempts.current >= MAX_RECONNECT_ATTEMPTS - 1) {
-          setError(null);
-        } else {
-          setError("Connecting...");
+        // Don't show error to user - we'll fall back to polling automatically
+        if (reconnectAttempts.current < MAX_RECONNECT_ATTEMPTS - 1) {
+          setError("Reconnecting...");
         }
       };
     } catch {
@@ -301,6 +332,52 @@ export function useGameSocket(gameId: string | null): UseGameSocketReturn {
       }
     };
   }, [phase]);
+
+  // Initial HTTP fetch - always load state immediately via REST, don't wait for WS
+  useEffect(() => {
+    if (!gameId) return;
+
+    let cancelled = false;
+    async function fetchInitial() {
+      try {
+        const res = await fetch(`${getApiBase()}/api/games/${gameId}`);
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        if (cancelled) return;
+
+        // Only apply if WS hasn't already delivered state
+        if (!gotWsState.current) {
+          const normalized = normalizeGameState(data, gameId!);
+          setGameState(normalized);
+          setPhase(normalized.phase);
+          setPlayers(normalized.players);
+          updateServerTime(normalized.timeRemaining);
+          setMessages(normalized.messages);
+          if (normalized.winner) setWinner(normalized.winner);
+          setConnected(true);
+          setError(null);
+        }
+      } catch {
+        // Will rely on WS or polling
+      }
+    }
+    fetchInitial();
+
+    return () => { cancelled = true; };
+  }, [gameId, updateServerTime]);
+
+  // Safety net: if WS hasn't delivered game_state within 5s, start polling
+  useEffect(() => {
+    if (!gameId) return;
+
+    const safetyTimer = setTimeout(() => {
+      if (!gotWsState.current && !pollInterval.current) {
+        startPolling();
+      }
+    }, 5000);
+
+    return () => clearTimeout(safetyTimer);
+  }, [gameId, startPolling]);
 
   // Connect / disconnect
   useEffect(() => {

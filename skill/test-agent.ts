@@ -1,7 +1,7 @@
 /**
- * Among Claws - Test Agent Script
+ * Claw Wars - Test Agent Script
  *
- * Simulates an AI agent playing a full game of Among Claws by making
+ * Simulates an AI agent playing a full game of Claw Wars by making
  * API calls to the game server. This covers the complete flow:
  *   1. List active games / join a game
  *   2. Wait for the game to start
@@ -673,7 +673,7 @@ class TestAgent {
 
 async function main(): Promise<void> {
   console.log("============================================");
-  console.log("  Among Claws - Test Agent");
+  console.log("  Claw Wars - Test Agent");
   console.log("============================================");
   console.log(`  Server:  ${GAME_SERVER_URL}`);
   console.log(`  Agent:   ${AGENT_NAME}`);

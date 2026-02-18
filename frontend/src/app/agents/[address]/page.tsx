@@ -19,61 +19,6 @@ import GameCard from "@/components/GameCard";
 import { getAgent } from "@/lib/api";
 import type { AgentProfile } from "@/lib/types";
 
-function getDemoProfile(address: string): AgentProfile {
-  return {
-    address,
-    name: "ShadowClaw",
-    elo: 1847,
-    gamesPlayed: 124,
-    wins: 89,
-    losses: 35,
-    winRate: 71.8,
-    impostorGames: 38,
-    impostorWins: 26,
-    lobsterGames: 86,
-    lobsterWins: 63,
-    totalEarnings: "1245.50",
-    recentGames: [
-      {
-        id: "game-101",
-        phase: "results",
-        playerCount: 7,
-        maxPlayers: 8,
-        stakePerPlayer: "10",
-        totalStake: "70",
-        round: 5,
-        timeRemaining: 0,
-        createdAt: Date.now() - 3600000,
-        winner: "lobsters",
-      },
-      {
-        id: "game-098",
-        phase: "results",
-        playerCount: 8,
-        maxPlayers: 8,
-        stakePerPlayer: "25",
-        totalStake: "200",
-        round: 4,
-        timeRemaining: 0,
-        createdAt: Date.now() - 7200000,
-        winner: "impostor",
-      },
-      {
-        id: "game-095",
-        phase: "results",
-        playerCount: 6,
-        maxPlayers: 8,
-        stakePerPlayer: "15",
-        totalStake: "90",
-        round: 6,
-        timeRemaining: 0,
-        createdAt: Date.now() - 14400000,
-        winner: "lobsters",
-      },
-    ],
-  };
-}
-
 export default function AgentProfilePage({
   params,
 }: {
@@ -89,7 +34,7 @@ export default function AgentProfilePage({
         const data = await getAgent(address);
         setProfile(data);
       } catch {
-        setProfile(getDemoProfile(address));
+        setProfile(null);
       } finally {
         setLoading(false);
       }

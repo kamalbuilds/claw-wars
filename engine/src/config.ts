@@ -29,6 +29,9 @@ export const config = {
   gemini: {
     apiKey: process.env.GEMINI_API_KEY || "",
   },
+  database: {
+    url: process.env.DATABASE_URL || "",
+  },
   game: {
     defaultStake: BigInt(process.env.DEFAULT_STAKE || "500000000000000000"),
     minPlayers: parseInt(process.env.MIN_PLAYERS || "5", 10),

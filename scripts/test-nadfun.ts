@@ -320,9 +320,9 @@ async function main() {
   } else {
     try {
       const testMetadata = {
-        name: "Among Claws",
+        name: "Claw Wars",
         symbol: "CLAW",
-        description: "Among Claws test token",
+        description: "Claw Wars test token",
       };
       const tokenURI = `data:application/json,${encodeURIComponent(JSON.stringify(testMetadata))}`;
       const salt = keccak256(toHex(`test-${Date.now()}`));
@@ -334,7 +334,7 @@ async function main() {
         functionName: "create",
         args: [
           {
-            name: "Among Claws",
+            name: "Claw Wars",
             symbol: "CLAW",
             tokenURI,
             amountOut: BigInt(0),

@@ -13,6 +13,8 @@ import {
 import { getAgentStats, getTopAgents, placeBetOnChain } from "../chain/contract.js";
 import { config } from "../config.js";
 import { logger } from "../utils/logger.js";
+import { getDbLeaderboard } from "../persistence/gameStore.js";
+import { GamePhase } from "../game/PhaseManager.js";
 
 const routeLogger = logger.child("API");
 const router = Router();
@@ -63,19 +65,50 @@ router.post("/api/games", async (req: Request, res: Response) => {
 });
 
 // ──────────────────────────────────────────
-// GET /api/games - List active games
+// GET /api/games - List all games (active + completed)
 // ──────────────────────────────────────────
 router.get("/api/games", (_req: Request, res: Response) => {
   try {
-    const games = gameManager.getActiveGames().map((g) => ({
-      gameId: g.gameId,
-      chainGameId: g.chainGameId?.toString() || null,
-      phase: g.phase,
-      playerCount: g.getPlayerCount(),
-      aliveCount: g.getAliveCount(),
-      roundNumber: g.roundNumber,
-      spectatorCount: g.spectators.size,
-    }));
+    // In-memory games (active + recently completed)
+    const inMemoryIds = new Set<string>();
+    const games = gameManager.getAllGames().map((g) => {
+      inMemoryIds.add(g.gameId);
+      const state = g.getState();
+      return {
+        gameId: g.gameId,
+        chainGameId: state.chainGameId,
+        phase: g.phase,
+        playerCount: g.getPlayerCount(),
+        aliveCount: g.getAliveCount(),
+        roundNumber: g.roundNumber,
+        maxPlayers: state.maxPlayers,
+        totalStake: state.totalStake,
+        stakePerPlayer: state.stakePerPlayer,
+        spectatorCount: g.spectators.size,
+        result: state.result,
+        winner: state.result === 1 ? "lobsters" : state.result === 2 ? "impostor" : null,
+      };
+    });
+
+    // Append DB completed games (skip duplicates)
+    for (const sg of gameManager.getCompletedGamesFromDb()) {
+      if (inMemoryIds.has(sg.gameId)) continue;
+      const stakePerPlayer = parseFloat(sg.stakePerPlayer) || 0;
+      games.push({
+        gameId: sg.gameId,
+        chainGameId: sg.chainGameId,
+        phase: GamePhase.End,
+        playerCount: sg.players.length,
+        aliveCount: sg.players.filter((p) => p.alive).length,
+        roundNumber: sg.roundNumber,
+        maxPlayers: sg.maxPlayers,
+        totalStake: (stakePerPlayer * sg.players.length).toFixed(4),
+        stakePerPlayer: sg.stakePerPlayer,
+        spectatorCount: 0,
+        result: sg.result,
+        winner: sg.result === 1 ? "lobsters" : sg.result === 2 ? "impostor" : null,
+      });
+    }
 
     res.json({ games, count: games.length });
   } catch (err) {
@@ -89,20 +122,50 @@ router.get("/api/games", (_req: Request, res: Response) => {
 // ──────────────────────────────────────────
 router.get("/api/games/:id", (req: Request, res: Response) => {
   try {
-    const room = gameManager.getGame(getParam(req.params.id));
-    if (!room) {
-      res.status(404).json({ error: "Game not found" });
+    const gameId = getParam(req.params.id);
+
+    // Try in-memory game first (active or recently completed)
+    const room = gameManager.getGame(gameId);
+    if (room) {
+      const forAgent = req.query.agent as `0x${string}` | undefined;
+      const state = room.getState(forAgent);
+      res.json(state);
       return;
     }
 
-    const forAgent = req.query.agent as `0x${string}` | undefined;
-    const state = room.getState(forAgent);
+    // Fall back to DB-stored completed game
+    const dbGame = gameManager.getCompletedGamesFromDb().find(
+      (g) => g.gameId === gameId
+    );
+    if (dbGame) {
+      const stakePerPlayer = parseFloat(dbGame.stakePerPlayer) || 0;
+      res.json({
+        gameId: dbGame.gameId,
+        chainGameId: dbGame.chainGameId,
+        phase: GamePhase.End,
+        phaseName: "End",
+        roundNumber: dbGame.roundNumber,
+        maxRounds: dbGame.maxRounds,
+        maxPlayers: dbGame.maxPlayers,
+        totalStake: (stakePerPlayer * dbGame.players.length).toFixed(4),
+        stakePerPlayer: dbGame.stakePerPlayer,
+        players: dbGame.players.map((p) => ({
+          address: p.address,
+          name: p.name,
+          alive: p.alive,
+          role: p.role,
+        })),
+        messages: dbGame.messages || [],
+        remainingTime: 0,
+        result: dbGame.result,
+        eliminations: dbGame.eliminations || [],
+        voteHistory: dbGame.voteHistory || [],
+        spectatorCount: 0,
+      });
+      return;
+    }
 
-    // Serialize chainGameId
-    res.json({
-      ...state,
-      chainGameId: state.chainGameId?.toString() || null,
-    });
+    res.status(404).json({ error: "Game not found" });
   } catch (err) {
     routeLogger.error("Failed to get game state", err);
     res.status(500).json({ error: "Failed to get game state" });
@@ -352,22 +415,68 @@ router.get("/api/leaderboard", async (_req: Request, res: Response) => {
     if (config.contracts.leaderboard) {
       try {
         const topAgents = await getTopAgents(BigInt(20));
-        const leaderboard = (topAgents as readonly { agent: `0x${string}`; gamesWon: bigint; totalEarned: bigint }[]).map(
-          (a) => ({
-            agent: a.agent,
-            gamesWon: a.gamesWon.toString(),
-            totalEarned: a.totalEarned.toString(),
-          })
+        const typedAgents = topAgents as readonly { agent: `0x${string}`; gamesWon: bigint; totalEarned: bigint }[];
+
+        // Enrich each agent with full stats
+        const leaderboard = await Promise.all(
+          typedAgents
+            .filter((a) => a.agent !== "0x0000000000000000000000000000000000000000")
+            .map(async (a, i) => {
+              try {
+                const stats = await getAgentStats(a.agent);
+                const gamesPlayed = Number(stats.gamesPlayed);
+                const gamesWon = Number(stats.gamesWon);
+                const impostorGames = Number(stats.impostorGames);
+                const impostorWins = Number(stats.impostorWins);
+
+                // Look up name from active games
+                const name = gameManager.getPlayerName(a.agent) ||
+                  `${a.agent.slice(0, 6)}...${a.agent.slice(-4)}`;
+
+                return {
+                  rank: i + 1,
+                  address: a.agent,
+                  name,
+                  elo: 1000 + gamesWon * 25,
+                  gamesPlayed,
+                  wins: gamesWon,
+                  winRate: gamesPlayed > 0 ? Math.round((gamesWon / gamesPlayed) * 100) : 0,
+                  impostorWinRate: impostorGames > 0 ? Math.round((impostorWins / impostorGames) * 100) : 0,
+                  earnings: (Number(stats.totalEarned) / 1e18).toFixed(4),
+                };
+              } catch {
+                return {
+                  rank: i + 1,
+                  address: a.agent,
+                  name: `${a.agent.slice(0, 6)}...${a.agent.slice(-4)}`,
+                  elo: 1000 + Number(a.gamesWon) * 25,
+                  gamesPlayed: 0,
+                  wins: Number(a.gamesWon),
+                  winRate: 0,
+                  impostorWinRate: 0,
+                  earnings: (Number(a.totalEarned) / 1e18).toFixed(4),
+                };
+              }
+            })
         );
+
         res.json({ leaderboard });
         return;
-      } catch {
-        // Fall through
+      } catch (err) {
+        routeLogger.warn("On-chain leaderboard read failed", err instanceof Error ? err.message : "");
       }
     }
 
-    // Return empty leaderboard if no on-chain data
-    res.json({ leaderboard: [], message: "On-chain leaderboard not available" });
+    // Tier 2: DB leaderboard (persisted across restarts)
+    const dbLeaderboard = await getDbLeaderboard();
+    if (dbLeaderboard && dbLeaderboard.length > 0) {
+      res.json({ leaderboard: dbLeaderboard });
+      return;
+    }
+
+    // Tier 3: in-memory fallback (current session only)
+    const localLeaderboard = gameManager.getLocalLeaderboard();
+    res.json({ leaderboard: localLeaderboard });
   } catch (err) {
     routeLogger.error("Failed to get leaderboard", err);
     res.status(500).json({ error: "Failed to get leaderboard" });
@@ -480,39 +589,71 @@ async function simulateDemoGame(
   room: GameRoom,
   agents: Array<{ name: string; address: `0x${string}` }>
 ): Promise<void> {
-  const messages: Record<string, string[]> = {
-    discussion: [
-      "I've been watching everyone carefully. Something feels off.",
-      "My scan results are interesting. Let me share what I found.",
-      "That's a bold claim. Can anyone verify?",
-      "The impostor is trying to blend in. Look at who's deflecting!",
-      "I trust the evidence. Let's vote based on facts, not feelings.",
-      "Hmm, that defense seems rehearsed. Suspicious.",
-      "I investigated and found something worth discussing.",
-      "We need to work together or the impostor wins.",
-      "Who hasn't spoken up yet? Silence is suspicious.",
-      "Let's cross-reference our scan results before voting.",
-    ],
+  const discussionMessages = [
+    "I've been watching everyone carefully. Something feels off.",
+    "My scan results are interesting. Let me share what I found.",
+    "That's a bold claim. Can anyone verify?",
+    "The impostor is trying to blend in. Look at who's deflecting!",
+    "I trust the evidence. Let's vote based on facts, not feelings.",
+    "Hmm, that defense seems rehearsed. Suspicious.",
+    "I investigated and found something worth discussing.",
+    "We need to work together or the impostor wins.",
+    "Who hasn't spoken up yet? Silence is suspicious.",
+    "Let's cross-reference our scan results before voting.",
+    "I'm pretty sure I know who the impostor is. Let's be strategic.",
+    "Don't let smooth talk fool you — watch the actions.",
+    "Can we talk about what happened last round?",
+    "The evidence points in one clear direction here.",
+    "I'm going to trust my gut on this one.",
+  ];
+
+  const doDiscussion = async () => {
+    const alive = agents.filter((a) => room.isPlayerAlive(a.address));
+    for (const agent of alive) {
+      const msg = discussionMessages[Math.floor(Math.random() * discussionMessages.length)];
+      room.submitMessage(agent.address, msg);
+      await new Promise((r) => setTimeout(r, 600 + Math.random() * 800));
+    }
+    // Investigations
+    for (const agent of alive.slice(0, 3)) {
+      const targets = alive.filter((a) => a.address !== agent.address);
+      const target = targets[Math.floor(Math.random() * targets.length)];
+      room.investigate(agent.address, target.address);
+      await new Promise((r) => setTimeout(r, 300));
+    }
   };
 
-  // Send discussion messages
-  const alive = agents.filter((a) =>
-    room.isPlayerAlive(a.address)
-  );
+  const doVoting = async () => {
+    const alive = agents.filter((a) => room.isPlayerAlive(a.address));
+    // Each alive agent votes for a random other alive agent
+    for (const agent of alive) {
+      const targets = alive.filter((a) => a.address !== agent.address);
+      if (targets.length === 0) continue;
+      const target = targets[Math.floor(Math.random() * targets.length)];
+      room.submitVote(agent.address, target.address);
+      await new Promise((r) => setTimeout(r, 500 + Math.random() * 1000));
+    }
+  };
 
-  for (const agent of alive) {
-    const msg = messages.discussion[Math.floor(Math.random() * messages.discussion.length)];
-    room.submitMessage(agent.address, msg);
-    await new Promise((r) => setTimeout(r, 800));
-  }
+  // Wire up phase-change-driven simulation
+  room.on("phaseChange", async (_gId: string, phase: string) => {
+    try {
+      if (phase === "Discussion") {
+        // Small delay so the phase is fully set
+        await new Promise((r) => setTimeout(r, 2000));
+        await doDiscussion();
+      } else if (phase === "Voting") {
+        await new Promise((r) => setTimeout(r, 2000));
+        await doVoting();
+      }
+    } catch {
+      // Game may have ended
+    }
+  });
 
-  // Do some investigations
-  for (const agent of alive.slice(0, 3)) {
-    const targets = alive.filter((a) => a.address !== agent.address);
-    const target = targets[Math.floor(Math.random() * targets.length)];
-    room.investigate(agent.address, target.address);
-    await new Promise((r) => setTimeout(r, 500));
-  }
+  // Run initial discussion (game already started in Discussion phase)
+  await new Promise((r) => setTimeout(r, 1000));
+  await doDiscussion();
 }
 
 // ──────────────────────────────────────────

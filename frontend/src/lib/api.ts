@@ -49,6 +49,13 @@ const PHASE_MAP: Record<number, GamePhase> = {
   4: "results",
 };
 
+function deriveWinner(raw: Record<string, unknown>): "lobsters" | "impostor" | null {
+  if (raw.winner === "lobsters" || raw.winner === "impostor") return raw.winner;
+  if (raw.result === 1) return "lobsters";
+  if (raw.result === 2) return "impostor";
+  return null;
+}
+
 function toPhase(phase: number | string): GamePhase {
   if (typeof phase === "number") return PHASE_MAP[phase] ?? "lobby";
   if (typeof phase === "string" && ["lobby", "discussion", "voting", "elimination", "results"].includes(phase))
@@ -66,9 +73,9 @@ function toGameSummary(raw: any): GameSummary {
     stakePerPlayer: raw.stakePerPlayer ?? "0",
     totalStake: raw.totalStake ?? "0",
     round: raw.roundNumber ?? raw.round ?? 1,
-    timeRemaining: raw.timeRemaining ?? 0,
+    timeRemaining: raw.timeRemaining ?? raw.remainingTime ?? 0,
     createdAt: raw.createdAt ?? Date.now(),
-    winner: raw.winner ?? null,
+    winner: deriveWinner(raw),
   };
 }
 
@@ -81,7 +88,7 @@ function toGameState(raw: any): GameState {
     players: (raw.players ?? []).map((p: Record<string, unknown>) => ({
       address: p.address ?? "",
       name: (p.name as string) ?? "",
-      role: ["lobster", "impostor", "unknown"].includes(p.role as string) ? p.role : "unknown",
+      role: (() => { const r = typeof p.role === "string" ? (p.role as string).toLowerCase() : ""; if (r === "impostor") return "impostor"; if (r === "lobster" || r === "crewmate") return "lobster"; return "unknown"; })(),
       isAlive: p.isAlive ?? p.alive ?? true,
       votedFor: p.votedFor || null,
       isSpeaking: p.isSpeaking ?? false,
@@ -94,13 +101,16 @@ function toGameState(raw: any): GameState {
       timestamp: m.timestamp ?? Date.now(),
       type: m.type ?? "discussion",
       senderAlive: m.senderAlive ?? true,
+      round: m.round ?? undefined,
     })),
-    timeRemaining: raw.timeRemaining ?? 0,
+    timeRemaining: raw.timeRemaining ?? raw.remainingTime ?? 0,
     totalStake: raw.totalStake ?? "0",
     stakePerPlayer: raw.stakePerPlayer ?? "0",
     maxPlayers: raw.maxPlayers ?? 8,
     createdAt: raw.createdAt ?? Date.now(),
-    winner: raw.winner ?? null,
+    winner: deriveWinner(raw),
+    voteHistory: Array.isArray(raw.voteHistory) ? raw.voteHistory : [],
+    eliminations: Array.isArray(raw.eliminations) ? raw.eliminations : [],
   };
 }
 
@@ -122,8 +132,19 @@ export async function getGame(id: string): Promise<GameState> {
 export async function getLeaderboard(): Promise<LeaderboardEntry[]> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const data = await fetchAPI<any>("/api/leaderboard");
-  if (Array.isArray(data)) return data;
-  return data.leaderboard ?? [];
+  const rawList = Array.isArray(data) ? data : (data.leaderboard ?? []);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return rawList.map((entry: any, i: number) => ({
+    rank: entry.rank ?? i + 1,
+    address: entry.address ?? entry.agent ?? "",
+    name: entry.name ?? `${(entry.address ?? entry.agent ?? "").slice(0, 6)}...${(entry.address ?? entry.agent ?? "").slice(-4)}`,
+    elo: entry.elo ?? 1000 + (Number(entry.wins ?? entry.gamesWon ?? 0) * 25),
+    gamesPlayed: entry.gamesPlayed ?? 0,
+    wins: entry.wins ?? Number(entry.gamesWon ?? 0),
+    winRate: entry.winRate ?? 0,
+    impostorWinRate: entry.impostorWinRate ?? 0,
+    earnings: entry.earnings ?? (Number(entry.totalEarned ?? 0) / 1e18).toFixed(4),
+  }));
 }
 
 export async function getAgent(address: string): Promise<AgentProfile> {

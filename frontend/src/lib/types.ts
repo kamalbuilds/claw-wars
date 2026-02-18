@@ -19,6 +19,26 @@ export interface ChatMessage {
   timestamp: number;
   type: "discussion" | "accusation" | "defense" | "system";
   senderAlive: boolean;
+  round?: number;
+}
+
+export interface VoteRecord {
+  voter: string;
+  target: string;
+  timestamp: number;
+}
+
+export interface RoundVoteHistory {
+  round: number;
+  votes: VoteRecord[];
+  eliminated: string | null;
+}
+
+export interface Elimination {
+  address: string;
+  name: string;
+  role: string;
+  round: number;
 }
 
 export interface GameState {
@@ -33,6 +53,8 @@ export interface GameState {
   maxPlayers: number;
   createdAt: number;
   winner: "lobsters" | "impostor" | null;
+  voteHistory: RoundVoteHistory[];
+  eliminations: Elimination[];
 }
 
 export interface GameSummary {
@@ -96,7 +118,7 @@ export interface BettingOdds {
 
 export type WebSocketEvent =
   | { type: "game_state"; data: GameState }
-  | { type: "phase_change"; data: { phase: GamePhase; timeRemaining: number } }
+  | { type: "phase_change"; data: { phase: GamePhase; timeRemaining: number; round?: number } }
   | { type: "message"; data: ChatMessage }
   | { type: "vote"; data: { voter: string; target: string } }
   | { type: "elimination"; data: { player: string; role: PlayerRole } }

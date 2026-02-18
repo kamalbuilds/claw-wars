@@ -2,6 +2,11 @@ import { GameRoom, GameResult } from "./GameRoom.js";
 import { createGameOnChain, joinGameOnChain } from "../chain/contract.js";
 import { config } from "../config.js";
 import { logger } from "../utils/logger.js";
+import {
+  saveCompletedGame,
+  loadCompletedGames,
+  type StoredGame,
+} from "../persistence/gameStore.js";
 
 const managerLogger = logger.child("GameManager");
 
@@ -17,6 +22,20 @@ export interface CreateGameOptions {
 class GameManager {
   private games = new Map<string, GameRoom>();
   private playerGames = new Map<string, Set<string>>();
+  private completedFromDb: StoredGame[] = [];
+
+  /** Load completed games from DB on startup */
+  async initialize(): Promise<void> {
+    this.completedFromDb = await loadCompletedGames();
+    managerLogger.info(
+      `Loaded ${this.completedFromDb.length} completed games from database`
+    );
+  }
+
+  /** Get DB-loaded completed games (for API routes) */
+  getCompletedGamesFromDb(): StoredGame[] {
+    return this.completedFromDb;
+  }
 
   async createGame(options: CreateGameOptions = {}): Promise<GameRoom> {
     const stake = options.stake || config.game.defaultStake;
@@ -57,11 +76,19 @@ class GameManager {
 
     this.games.set(room.gameId, room);
 
-    // Wire up game events for logging
+    // Wire up game events for logging + persistence
     room.on("gameEnd", (gameId: string, result: GameResult) => {
       managerLogger.info(
         `Game ${gameId} ended with result: ${result === GameResult.CrewmatesWin ? "Crewmates Win" : "Impostor Wins"}`
       );
+
+      // Persist to DB (fire-and-forget)
+      saveCompletedGame(room).catch((err) => {
+        managerLogger.error(
+          `Failed to persist game ${gameId}`,
+          err instanceof Error ? err.message : err
+        );
+      });
     });
 
     managerLogger.info(
@@ -171,10 +198,94 @@ class GameManager {
       0
     );
     return {
-      totalGames: this.games.size,
+      totalGames: this.games.size + this.completedFromDb.length,
       activeGames: activeGames.length,
       totalPlayers,
     };
+  }
+
+  /** Look up player name from any game they've been in */
+  getPlayerName(address: `0x${string}`): string | null {
+    const normalized = address.toLowerCase();
+    for (const game of this.games.values()) {
+      const player = game.players.get(normalized as `0x${string}`);
+      if (player) return player.name;
+    }
+    // Also check DB games
+    for (const sg of this.completedFromDb) {
+      const found = sg.players.find(
+        (p) => p.address.toLowerCase() === normalized
+      );
+      if (found) return found.name;
+    }
+    return null;
+  }
+
+  /** Build leaderboard from locally tracked completed games */
+  getLocalLeaderboard(): Array<{
+    rank: number;
+    address: string;
+    name: string;
+    elo: number;
+    gamesPlayed: number;
+    wins: number;
+    winRate: number;
+    impostorWinRate: number;
+    earnings: string;
+  }> {
+    const stats = new Map<string, {
+      address: string;
+      name: string;
+      gamesPlayed: number;
+      wins: number;
+      impostorGames: number;
+      impostorWins: number;
+    }>();
+
+    for (const game of this.games.values()) {
+      if (game.result === GameResult.Ongoing) continue;
+
+      const winners = game.result === GameResult.CrewmatesWin
+        ? Array.from(game.players.values()).filter((p) => p.role.toString() !== "Impostor")
+        : Array.from(game.players.values()).filter((p) => p.role.toString() === "Impostor");
+      const winnerAddrs = new Set(winners.map((w) => w.address.toLowerCase()));
+
+      for (const player of game.players.values()) {
+        const key = player.address.toLowerCase();
+        if (!stats.has(key)) {
+          stats.set(key, {
+            address: player.address,
+            name: player.name,
+            gamesPlayed: 0,
+            wins: 0,
+            impostorGames: 0,
+            impostorWins: 0,
+          });
+        }
+        const s = stats.get(key)!;
+        s.gamesPlayed++;
+        if (winnerAddrs.has(key)) s.wins++;
+        if (player.role.toString() === "Impostor") {
+          s.impostorGames++;
+          if (winnerAddrs.has(key)) s.impostorWins++;
+        }
+      }
+    }
+
+    return Array.from(stats.values())
+      .sort((a, b) => b.wins - a.wins)
+      .slice(0, 20)
+      .map((s, i) => ({
+        rank: i + 1,
+        address: s.address,
+        name: s.name,
+        elo: 1000 + s.wins * 25,
+        gamesPlayed: s.gamesPlayed,
+        wins: s.wins,
+        winRate: s.gamesPlayed > 0 ? Math.round((s.wins / s.gamesPlayed) * 100) : 0,
+        impostorWinRate: s.impostorGames > 0 ? Math.round((s.impostorWins / s.impostorGames) * 100) : 0,
+        earnings: "0.0000",
+      }));
   }
 }
 

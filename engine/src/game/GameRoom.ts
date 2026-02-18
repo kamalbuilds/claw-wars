@@ -17,6 +17,9 @@ import {
   getVoteRecords,
   resetVotes,
   cleanupVotes,
+  archiveRoundVotes,
+  getVoteHistory,
+  type RoundVoteHistory,
 } from "./VoteResolver.js";
 import {
   phaseManager,
@@ -71,11 +74,14 @@ export interface InvestigationResult {
 
 export interface GameState {
   gameId: string;
-  chainGameId: bigint | null;
+  chainGameId: string | null;
   phase: GamePhase;
   phaseName: string;
   roundNumber: number;
   maxRounds: number;
+  maxPlayers: number;
+  totalStake: string;
+  stakePerPlayer: string;
   players: Array<{
     address: `0x${string}`;
     name: string;
@@ -91,6 +97,7 @@ export interface GameState {
     role: string;
     round: number;
   }>;
+  voteHistory: RoundVoteHistory[];
   spectatorCount: number;
 }
 
@@ -440,6 +447,17 @@ export class GameRoom extends EventEmitter {
     this.phase = GamePhase.Resolution;
     phaseManager.startPhase(this.gameId, GamePhase.Resolution, 0);
 
+    const voteRecords = getVoteRecords(this.gameId);
+    if (voteRecords.length === 0) {
+      roomLogger.warn(
+        `⚠ ZERO votes cast in game ${this.gameId} round ${this.roundNumber} — agents may not be voting`
+      );
+    } else {
+      roomLogger.info(
+        `${voteRecords.length} votes cast in game ${this.gameId} round ${this.roundNumber}`
+      );
+    }
+
     const eliminated = resolveVotes(this.gameId);
 
     if (eliminated) {
@@ -494,6 +512,9 @@ export class GameRoom extends EventEmitter {
       );
       this.emit("noElimination", this.gameId, this.roundNumber);
     }
+
+    // Archive this round's votes before moving on
+    archiveRoundVotes(this.gameId, this.roundNumber, eliminated);
 
     // Check win condition
     const winResult = this.checkWinCondition();
@@ -621,18 +642,26 @@ export class GameRoom extends EventEmitter {
       return base;
     });
 
+    // Compute stake values as human-readable strings (not wei)
+    const stakePerPlayer = Number(this.stake) / 1e18;
+    const totalStake = stakePerPlayer * this.players.size;
+
     return {
       gameId: this.gameId,
-      chainGameId: this.chainGameId,
+      chainGameId: this.chainGameId !== null ? this.chainGameId.toString() : null,
       phase: this.phase,
       phaseName: PHASE_NAMES[this.phase],
       roundNumber: this.roundNumber,
       maxRounds: this.maxRounds,
+      maxPlayers: this.maxPlayers,
+      totalStake: totalStake.toFixed(4),
+      stakePerPlayer: stakePerPlayer.toFixed(4),
       players: playerList,
-      messages: this.messages.filter((m) => m.round === this.roundNumber),
+      messages: this.messages, // All messages across all rounds (each has .round field)
       remainingTime: phaseManager.getRemainingTime(this.gameId),
       result: this.result,
       eliminations: this.eliminations,
+      voteHistory: getVoteHistory(this.gameId),
       spectatorCount: this.spectators.size,
     };
   }
