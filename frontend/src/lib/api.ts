@@ -155,5 +155,65 @@ export async function getGameOdds(gameId: string): Promise<BettingOdds> {
   return fetchAPI<BettingOdds>(`/api/games/${gameId}/odds`);
 }
 
+// ─── Tournament API ───
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function getTournaments(): Promise<any[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const data = await fetchAPI<any>("/api/tournaments");
+  return data.tournaments ?? [];
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function getTournament(id: string): Promise<any> {
+  return fetchAPI(`/api/tournaments/${id}`);
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function getTournamentBracket(id: string): Promise<any[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const data = await fetchAPI<any>(`/api/tournaments/${id}/bracket`);
+  return data.bracket ?? [];
+}
+
+// ─── Season API ───
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function getSeasons(): Promise<any[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const data = await fetchAPI<any>("/api/seasons");
+  return data.seasons ?? [];
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function getCurrentSeason(): Promise<any | null> {
+  try {
+    return await fetchAPI("/api/seasons/current");
+  } catch {
+    return null;
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function getSeasonLeaderboard(seasonId: string): Promise<any[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const data = await fetchAPI<any>(`/api/seasons/${seasonId}/leaderboard`);
+  return data.leaderboard ?? [];
+}
+
+// ─── Arena API ───
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function getArenas(): Promise<any> {
+  return fetchAPI("/api/arenas");
+}
+
+// ─── Analytics API ───
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function getAnalytics(): Promise<any> {
+  return fetchAPI("/api/analytics");
+}
+
 // Betting is handled on-chain via the ClawWarsBetting smart contract.
 // See src/lib/contracts.ts for the contract ABI and helpers.

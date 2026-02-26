@@ -3,6 +3,7 @@ import cors from "cors";
 import http from "node:http";
 import { config } from "./config.js";
 import { router } from "./api/routes.js";
+import { tournamentRouter } from "./api/tournamentRoutes.js";
 import { createWebSocketServer, getConnectedClients } from "./ws/server.js";
 import { gameManager } from "./game/GameManager.js";
 import { logger } from "./utils/logger.js";
@@ -24,6 +25,7 @@ app.use((req, _res, next) => {
 
 // Mount API routes
 app.use(router);
+app.use(tournamentRouter);
 
 // 404 handler
 app.use((_req, res) => {

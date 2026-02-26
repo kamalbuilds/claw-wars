@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import Image from "next/image";
-import { Gamepad2, Trophy, Home, Menu, X } from "lucide-react";
+import { Gamepad2, Trophy, Home, Menu, X, Swords, Calendar, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
@@ -12,7 +12,10 @@ import { useState } from "react";
 const navLinks = [
   { href: "/", label: "Home", icon: Home },
   { href: "/games", label: "Games", icon: Gamepad2 },
+  { href: "/tournaments", label: "Tournaments", icon: Swords },
+  { href: "/seasons", label: "Seasons", icon: Calendar },
   { href: "/leaderboard", label: "Leaderboard", icon: Trophy },
+  { href: "/analytics", label: "Analytics", icon: BarChart3 },
 ];
 
 export default function Navbar() {

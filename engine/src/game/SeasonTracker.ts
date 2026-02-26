@@ -1,0 +1,223 @@
+import { EventEmitter } from "events";
+import { logger } from "../utils/logger.js";
+
+const seasonLogger = logger.child("SeasonTracker");
+
+export enum SeasonStatus {
+  Upcoming = "Upcoming",
+  Active = "Active",
+  Ended = "Ended",
+}
+
+export interface SeasonPlayerStats {
+  address: string;
+  gamesPlayed: number;
+  gamesWon: number;
+  tournamentsWon: number;
+  correctVotes: number;
+  points: number;
+}
+
+export interface SeasonData {
+  id: string;
+  name: string;
+  startTime: number;
+  endTime: number;
+  status: SeasonStatus;
+  topRewardSlots: number;
+  players: Map<string, SeasonPlayerStats>;
+  createdAt: number;
+}
+
+export interface SeasonConfig {
+  name: string;
+  startTime: number;
+  endTime: number;
+  topRewardSlots: number;
+}
+
+// Points per action
+const POINTS_PER_GAME = 10;
+const POINTS_PER_WIN = 25;
+const POINTS_PER_TOURNAMENT_WIN = 100;
+const POINTS_PER_CORRECT_VOTE = 5;
+
+class SeasonTracker extends EventEmitter {
+  private seasons = new Map<string, SeasonData>();
+  private currentSeasonId: string | null = null;
+  private nextId = 1;
+
+  createSeason(config: SeasonConfig): SeasonData {
+    const id = `season-${this.nextId++}`;
+
+    const season: SeasonData = {
+      id,
+      name: config.name,
+      startTime: config.startTime,
+      endTime: config.endTime,
+      status: SeasonStatus.Upcoming,
+      topRewardSlots: config.topRewardSlots,
+      players: new Map(),
+      createdAt: Date.now(),
+    };
+
+    this.seasons.set(id, season);
+    this.emit("seasonCreated", season);
+    seasonLogger.info(`Season created: ${id} - ${config.name}`);
+
+    return season;
+  }
+
+  startSeason(seasonId: string): boolean {
+    const s = this.seasons.get(seasonId);
+    if (!s || s.status !== SeasonStatus.Upcoming) return false;
+
+    s.status = SeasonStatus.Active;
+    this.currentSeasonId = seasonId;
+    this.emit("seasonStarted", seasonId);
+    seasonLogger.info(`Season started: ${seasonId}`);
+    return true;
+  }
+
+  endSeason(seasonId: string): boolean {
+    const s = this.seasons.get(seasonId);
+    if (!s || s.status !== SeasonStatus.Active) return false;
+
+    s.status = SeasonStatus.Ended;
+    if (this.currentSeasonId === seasonId) this.currentSeasonId = null;
+    this.emit("seasonEnded", seasonId);
+    seasonLogger.info(`Season ended: ${seasonId}`);
+    return true;
+  }
+
+  getCurrentSeason(): SeasonData | null {
+    if (!this.currentSeasonId) return null;
+    return this.seasons.get(this.currentSeasonId) || null;
+  }
+
+  // -----------------------------------------------------------------------
+  // Recording Results
+  // -----------------------------------------------------------------------
+
+  recordGame(address: string, won: boolean): void {
+    const season = this.getCurrentSeason();
+    if (!season) return;
+
+    const stats = this.ensurePlayer(season, address);
+    stats.gamesPlayed++;
+    stats.points += POINTS_PER_GAME;
+
+    if (won) {
+      stats.gamesWon++;
+      stats.points += POINTS_PER_WIN;
+    }
+
+    this.emit("gameRecorded", season.id, address, won);
+  }
+
+  recordTournamentWin(address: string): void {
+    const season = this.getCurrentSeason();
+    if (!season) return;
+
+    const stats = this.ensurePlayer(season, address);
+    stats.tournamentsWon++;
+    stats.points += POINTS_PER_TOURNAMENT_WIN;
+
+    this.emit("tournamentWinRecorded", season.id, address);
+  }
+
+  recordCorrectVote(address: string): void {
+    const season = this.getCurrentSeason();
+    if (!season) return;
+
+    const stats = this.ensurePlayer(season, address);
+    stats.correctVotes++;
+    stats.points += POINTS_PER_CORRECT_VOTE;
+  }
+
+  addBonusPoints(address: string, points: number, reason: string): void {
+    const season = this.getCurrentSeason();
+    if (!season) return;
+
+    const stats = this.ensurePlayer(season, address);
+    stats.points += points;
+
+    this.emit("bonusPoints", season.id, address, points, reason);
+    seasonLogger.info(`Bonus points: ${address} +${points} (${reason})`);
+  }
+
+  // -----------------------------------------------------------------------
+  // Rankings
+  // -----------------------------------------------------------------------
+
+  getLeaderboard(seasonId: string, count: number = 20): SeasonPlayerStats[] {
+    const season = this.seasons.get(seasonId);
+    if (!season) return [];
+
+    return Array.from(season.players.values())
+      .sort((a, b) => b.points - a.points)
+      .slice(0, count);
+  }
+
+  getPlayerStats(seasonId: string, address: string): SeasonPlayerStats | null {
+    const season = this.seasons.get(seasonId);
+    if (!season) return null;
+    return season.players.get(address.toLowerCase()) || null;
+  }
+
+  getPlayerRank(seasonId: string, address: string): number {
+    const leaderboard = this.getLeaderboard(seasonId, 999);
+    const idx = leaderboard.findIndex((p) => p.address === address.toLowerCase());
+    return idx >= 0 ? idx + 1 : -1;
+  }
+
+  // -----------------------------------------------------------------------
+  // Getters
+  // -----------------------------------------------------------------------
+
+  getSeason(id: string): SeasonData | undefined {
+    return this.seasons.get(id);
+  }
+
+  getAllSeasons(): SeasonData[] {
+    return Array.from(this.seasons.values());
+  }
+
+  getState(seasonId: string): object | null {
+    const s = this.seasons.get(seasonId);
+    if (!s) return null;
+
+    return {
+      id: s.id,
+      name: s.name,
+      startTime: s.startTime,
+      endTime: s.endTime,
+      status: s.status,
+      topRewardSlots: s.topRewardSlots,
+      participantCount: s.players.size,
+      leaderboard: this.getLeaderboard(seasonId, 20),
+      createdAt: s.createdAt,
+    };
+  }
+
+  // -----------------------------------------------------------------------
+  // Internal
+  // -----------------------------------------------------------------------
+
+  private ensurePlayer(season: SeasonData, address: string): SeasonPlayerStats {
+    const normalized = address.toLowerCase();
+    if (!season.players.has(normalized)) {
+      season.players.set(normalized, {
+        address: normalized,
+        gamesPlayed: 0,
+        gamesWon: 0,
+        tournamentsWon: 0,
+        correctVotes: 0,
+        points: 0,
+      });
+    }
+    return season.players.get(normalized)!;
+  }
+}
+
+export const seasonTracker = new SeasonTracker();
