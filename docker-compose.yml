@@ -1,11 +1,31 @@
 version: "3.8"
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: claw-wars-db
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=clawwars
+      - POSTGRES_PASSWORD=clawwars
+      - POSTGRES_DB=clawwars
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U clawwars"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   game-engine:
     build:
       context: ./engine
       dockerfile: Dockerfile
     container_name: claw-wars-engine
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports:
       - "3001:3001"
       - "3002:3002"
@@ -13,6 +33,7 @@ services:
       - NODE_ENV=production
       - PORT=3001
       - WS_PORT=3002
+      - DATABASE_URL=postgresql://clawwars:clawwars@postgres:5432/clawwars
       - MONAD_RPC_URL=${MONAD_RPC_URL:-https://rpc.monad.xyz}
       - MONAD_CHAIN_ID=${MONAD_CHAIN_ID:-143}
       - OPERATOR_PRIVATE_KEY=${OPERATOR_PRIVATE_KEY}
@@ -64,3 +85,6 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+volumes:
+  pgdata:

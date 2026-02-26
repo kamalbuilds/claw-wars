@@ -14,6 +14,7 @@ import { getAgentStats, getTopAgents, placeBetOnChain } from "../chain/contract.
 import { config } from "../config.js";
 import { logger } from "../utils/logger.js";
 import { getDbLeaderboard } from "../persistence/gameStore.js";
+import { saveBet } from "../persistence/colosseumStore.js";
 import { GamePhase } from "../game/PhaseManager.js";
 
 const routeLogger = logger.child("API");
@@ -517,6 +518,16 @@ router.post(
           (predictedAgent || "0x0000000000000000000000000000000000000000") as `0x${string}`,
           BigInt(amount)
         );
+
+        // Persist bet to DB for analytics (non-blocking)
+        saveBet({
+          gameId,
+          bettor: address,
+          betType: parseInt(betType, 10),
+          predictedAgent: predictedAgent || null,
+          amount: String(amount),
+          chainTxHash: txHash,
+        }).catch((err) => routeLogger.error("Failed to save bet to DB", err));
 
         res.json({
           success: true,

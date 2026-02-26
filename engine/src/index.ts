@@ -6,6 +6,9 @@ import { router } from "./api/routes.js";
 import { tournamentRouter } from "./api/tournamentRoutes.js";
 import { createWebSocketServer, getConnectedClients } from "./ws/server.js";
 import { gameManager } from "./game/GameManager.js";
+import { tournamentManager } from "./game/TournamentManager.js";
+import { seasonTracker } from "./game/SeasonTracker.js";
+import { arenaFramework } from "./game/ArenaFramework.js";
 import { logger } from "./utils/logger.js";
 import { initDb, closeDb } from "./persistence/db.js";
 
@@ -55,6 +58,14 @@ const wss = createWebSocketServer(server);
 async function start(): Promise<void> {
   // Initialize PostgreSQL (graceful — falls back to memory-only if unavailable)
   await initDb();
+
+  // Load persisted Colosseum state from DB
+  await Promise.all([
+    tournamentManager.loadFromDb(),
+    seasonTracker.loadFromDb(),
+    arenaFramework.loadFromDb(),
+  ]);
+
   await gameManager.initialize();
 
   server.listen(config.server.port, () => {

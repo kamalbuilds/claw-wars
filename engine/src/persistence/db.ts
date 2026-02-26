@@ -47,6 +47,81 @@ const MIGRATION_SQL = `
 
   CREATE INDEX IF NOT EXISTS idx_completed_games_ended
     ON completed_games (ended_at DESC);
+
+  -- Colosseum: Tournaments
+  CREATE TABLE IF NOT EXISTS tournaments (
+    id               TEXT        PRIMARY KEY,
+    on_chain_id      TEXT,
+    name             TEXT        NOT NULL,
+    entry_fee        TEXT        NOT NULL DEFAULT '0',
+    prize_pool       TEXT        NOT NULL DEFAULT '0',
+    max_participants SMALLINT    NOT NULL,
+    current_round    SMALLINT    NOT NULL DEFAULT 0,
+    total_rounds     SMALLINT    NOT NULL,
+    status           TEXT        NOT NULL DEFAULT 'Registration',
+    registration_deadline BIGINT NOT NULL,
+    arena_type       SMALLINT    NOT NULL DEFAULT 0,
+    participants     JSONB       NOT NULL DEFAULT '[]',
+    brackets         JSONB       NOT NULL DEFAULT '{}',
+    placements       JSONB       NOT NULL DEFAULT '{}',
+    created_at       BIGINT      NOT NULL DEFAULT (EXTRACT(EPOCH FROM now()) * 1000)::BIGINT,
+    updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_tournaments_status
+    ON tournaments (status);
+
+  -- Colosseum: Seasons
+  CREATE TABLE IF NOT EXISTS seasons (
+    id              TEXT        PRIMARY KEY,
+    on_chain_id     TEXT,
+    name            TEXT        NOT NULL,
+    start_time      BIGINT      NOT NULL,
+    end_time        BIGINT      NOT NULL,
+    status          TEXT        NOT NULL DEFAULT 'Upcoming',
+    top_reward_slots SMALLINT   NOT NULL DEFAULT 10,
+    player_stats    JSONB       NOT NULL DEFAULT '{}',
+    created_at      BIGINT      NOT NULL DEFAULT (EXTRACT(EPOCH FROM now()) * 1000)::BIGINT,
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_seasons_status
+    ON seasons (status);
+
+  -- Colosseum: Bets (for analytics)
+  CREATE TABLE IF NOT EXISTS bets (
+    id              SERIAL      PRIMARY KEY,
+    game_id         TEXT        NOT NULL,
+    bettor          TEXT        NOT NULL,
+    bet_type        SMALLINT    NOT NULL,
+    predicted_agent TEXT,
+    amount          TEXT        NOT NULL,
+    settled         BOOLEAN     NOT NULL DEFAULT false,
+    won             BOOLEAN,
+    payout          TEXT,
+    chain_tx_hash   TEXT,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_bets_game
+    ON bets (game_id);
+
+  CREATE INDEX IF NOT EXISTS idx_bets_bettor
+    ON bets (bettor);
+
+  -- Colosseum: Arena stats
+  CREATE TABLE IF NOT EXISTS arenas (
+    id              SMALLINT    PRIMARY KEY,
+    name            TEXT        NOT NULL,
+    description     TEXT        NOT NULL DEFAULT '',
+    min_players     SMALLINT    NOT NULL,
+    max_players     SMALLINT    NOT NULL,
+    default_stake   TEXT        NOT NULL DEFAULT '0',
+    active          BOOLEAN     NOT NULL DEFAULT true,
+    games_played    INT         NOT NULL DEFAULT 0,
+    total_volume    TEXT        NOT NULL DEFAULT '0',
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
 `;
 
 export async function initDb(): Promise<void> {

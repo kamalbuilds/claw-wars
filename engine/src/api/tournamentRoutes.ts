@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { tournamentManager } from "../game/TournamentManager.js";
 import { seasonTracker } from "../game/SeasonTracker.js";
 import { arenaFramework } from "../game/ArenaFramework.js";
+import { getBettingAnalytics } from "../persistence/colosseumStore.js";
 import { logger } from "../utils/logger.js";
 
 const routeLogger = logger.child("TournamentAPI");
@@ -320,7 +321,7 @@ router.get("/api/arenas/active", (_req: Request, res: Response) => {
 // ══════════════════════════════════════════
 
 // GET /api/analytics - Platform analytics
-router.get("/api/analytics", (_req: Request, res: Response) => {
+router.get("/api/analytics", async (_req: Request, res: Response) => {
   try {
     const tournaments = tournamentManager.getAllTournaments();
     const seasons = seasonTracker.getAllSeasons();
@@ -333,6 +334,9 @@ router.get("/api/analytics", (_req: Request, res: Response) => {
     const currentSeason = seasonTracker.getCurrentSeason();
     const totalArenaGames = arenas.reduce((sum, a) => sum + a.gamesPlayed, 0);
     const totalArenaVolume = arenas.reduce((sum, a) => sum + a.totalVolume, 0n);
+
+    // Fetch betting analytics from DB
+    const bettingStats = await getBettingAnalytics();
 
     res.json({
       tournaments: {
@@ -350,6 +354,7 @@ router.get("/api/analytics", (_req: Request, res: Response) => {
         totalGamesPlayed: totalArenaGames,
         totalVolume: totalArenaVolume.toString(),
       },
+      betting: bettingStats || { totalBets: 0, totalVolume: "0", totalPayout: "0", uniqueBettors: 0 },
     });
   } catch (err) {
     res.status(500).json({ error: "Failed to get analytics" });

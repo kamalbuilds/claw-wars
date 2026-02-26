@@ -9,6 +9,7 @@ import {
   cancelTournamentOnChain,
 } from "../chain/colosseum-contract.js";
 import { walletClient } from "../chain/client.js";
+import { saveTournament, loadTournaments } from "../persistence/colosseumStore.js";
 
 const tournamentLogger = logger.child("TournamentManager");
 
@@ -59,6 +60,26 @@ class TournamentManager extends EventEmitter {
   private tournaments = new Map<string, TournamentData>();
   private nextId = 1;
 
+  /** Load active tournaments from Postgres on startup */
+  async loadFromDb(): Promise<void> {
+    const saved = await loadTournaments();
+    for (const t of saved) {
+      this.tournaments.set(t.id, t);
+      const idNum = parseInt(t.id.replace("tournament-", ""), 10);
+      if (!isNaN(idNum) && idNum >= this.nextId) this.nextId = idNum + 1;
+    }
+    if (saved.length > 0) {
+      tournamentLogger.info(`Restored ${saved.length} tournaments from DB`);
+    }
+  }
+
+  /** Persist tournament state (non-blocking) */
+  private persist(t: TournamentData): void {
+    saveTournament(t).catch((err) =>
+      tournamentLogger.error(`Failed to persist tournament ${t.id}`, err)
+    );
+  }
+
   createTournament(config: TournamentConfig): TournamentData {
     const { name, entryFee, maxParticipants, registrationDurationMs, arenaType } = config;
 
@@ -88,6 +109,7 @@ class TournamentManager extends EventEmitter {
     };
 
     this.tournaments.set(id, tournament);
+    this.persist(tournament);
     this.emit("tournamentCreated", tournament);
     tournamentLogger.info(`Tournament created: ${id} - ${name} (${maxParticipants} players)`);
 
@@ -114,6 +136,7 @@ class TournamentManager extends EventEmitter {
 
     t.participants.push(playerAddress);
     t.prizePool += t.entryFee;
+    this.persist(t);
     this.emit("playerRegistered", tournamentId, playerAddress);
 
     tournamentLogger.info(`Player ${playerAddress} registered for ${tournamentId} (${t.participants.length}/${t.maxParticipants})`);
@@ -151,6 +174,7 @@ class TournamentManager extends EventEmitter {
       t.brackets.set(`1-${i}`, match);
     }
 
+    this.persist(t);
     this.emit("tournamentStarted", tournamentId);
     tournamentLogger.info(`Tournament ${tournamentId} started with ${matchCount} round-1 matches`);
 
@@ -241,6 +265,7 @@ class TournamentManager extends EventEmitter {
 
     match.winner = winner;
     match.completed = true;
+    this.persist(t);
 
     this.emit("matchCompleted", tournamentId, round, matchIndex, winner);
     tournamentLogger.info(`Match ${round}-${matchIndex} in ${tournamentId} - winner set to ${winner}`);
@@ -298,6 +323,7 @@ class TournamentManager extends EventEmitter {
       t.brackets.set(`${nextRound}-${i}`, newMatch);
     }
 
+    this.persist(t);
     this.emit("roundAdvanced", t.id, nextRound);
     tournamentLogger.info(`Tournament ${t.id} advanced to round ${nextRound}`);
   }
@@ -324,6 +350,7 @@ class TournamentManager extends EventEmitter {
       t.placements.set(4, loser2);
     }
 
+    this.persist(t);
     this.emit("tournamentCompleted", t.id, champion);
     tournamentLogger.info(`Tournament ${t.id} completed! Champion: ${champion}`);
   }

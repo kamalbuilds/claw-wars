@@ -10,6 +10,7 @@ import {
   updateNFTGameStats,
 } from "../chain/colosseum-contract.js";
 import { walletClient } from "../chain/client.js";
+import { saveSeason, loadSeasons } from "../persistence/colosseumStore.js";
 
 const seasonLogger = logger.child("SeasonTracker");
 
@@ -58,6 +59,27 @@ class SeasonTracker extends EventEmitter {
   private currentSeasonId: string | null = null;
   private nextId = 1;
 
+  /** Load active seasons from Postgres on startup */
+  async loadFromDb(): Promise<void> {
+    const saved = await loadSeasons();
+    for (const s of saved) {
+      this.seasons.set(s.id, s);
+      if (s.status === SeasonStatus.Active) this.currentSeasonId = s.id;
+      const idNum = parseInt(s.id.replace("season-", ""), 10);
+      if (!isNaN(idNum) && idNum >= this.nextId) this.nextId = idNum + 1;
+    }
+    if (saved.length > 0) {
+      seasonLogger.info(`Restored ${saved.length} seasons from DB`);
+    }
+  }
+
+  /** Persist season state (non-blocking) */
+  private persist(s: SeasonData): void {
+    saveSeason(s).catch((err) =>
+      seasonLogger.error(`Failed to persist season ${s.id}`, err)
+    );
+  }
+
   createSeason(config: SeasonConfig): SeasonData {
     const id = `season-${this.nextId++}`;
 
@@ -74,6 +96,7 @@ class SeasonTracker extends EventEmitter {
     };
 
     this.seasons.set(id, season);
+    this.persist(season);
     this.emit("seasonCreated", season);
     seasonLogger.info(`Season created: ${id} - ${config.name}`);
 
@@ -97,6 +120,7 @@ class SeasonTracker extends EventEmitter {
 
     s.status = SeasonStatus.Active;
     this.currentSeasonId = seasonId;
+    this.persist(s);
     this.emit("seasonStarted", seasonId);
     seasonLogger.info(`Season started: ${seasonId}`);
 
@@ -118,6 +142,7 @@ class SeasonTracker extends EventEmitter {
 
     s.status = SeasonStatus.Ended;
     if (this.currentSeasonId === seasonId) this.currentSeasonId = null;
+    this.persist(s);
     this.emit("seasonEnded", seasonId);
     seasonLogger.info(`Season ended: ${seasonId}`);
 
@@ -155,6 +180,7 @@ class SeasonTracker extends EventEmitter {
       stats.points += POINTS_PER_WIN;
     }
 
+    this.persist(season);
     this.emit("gameRecorded", season.id, address, won);
 
     // Record on-chain: season stats + NFT stats (non-blocking)
@@ -180,6 +206,7 @@ class SeasonTracker extends EventEmitter {
     stats.tournamentsWon++;
     stats.points += POINTS_PER_TOURNAMENT_WIN;
 
+    this.persist(season);
     this.emit("tournamentWinRecorded", season.id, address);
 
     // Record on-chain (non-blocking)
@@ -197,6 +224,7 @@ class SeasonTracker extends EventEmitter {
     const stats = this.ensurePlayer(season, address);
     stats.correctVotes++;
     stats.points += POINTS_PER_CORRECT_VOTE;
+    this.persist(season);
 
     // Record on-chain (non-blocking)
     if (walletClient && address.startsWith("0x") && season.onChainId !== null) {
@@ -212,6 +240,7 @@ class SeasonTracker extends EventEmitter {
 
     const stats = this.ensurePlayer(season, address);
     stats.points += points;
+    this.persist(season);
 
     this.emit("bonusPoints", season.id, address, points, reason);
     seasonLogger.info(`Bonus points: ${address} +${points} (${reason})`);

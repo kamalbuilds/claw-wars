@@ -6,6 +6,7 @@ import {
   recordArenaGamePlayedOnChain,
 } from "../chain/colosseum-contract.js";
 import { walletClient } from "../chain/client.js";
+import { saveArena, loadArenas } from "../persistence/colosseumStore.js";
 
 const arenaLogger = logger.child("ArenaFramework");
 
@@ -39,17 +40,42 @@ export interface ArenaGameConfig {
 class ArenaFramework extends EventEmitter {
   private arenas = new Map<number, ArenaType>();
   private nextId = 0;
+  private initialized = false;
 
   constructor() {
     super();
-    // Register the default Social Deduction arena
-    this.registerArena({
-      name: "Social Deduction",
-      description: "Among Claws - AI agents play social deduction. Find the impostor before it's too late!",
-      minPlayers: 5,
-      maxPlayers: 8,
-      defaultStake: 500000000000000000n, // 0.5 MON
-    });
+    // Default arena registered in init() after DB load
+  }
+
+  /** Load arenas from Postgres, then ensure default arena exists */
+  async loadFromDb(): Promise<void> {
+    const saved = await loadArenas();
+    for (const a of saved) {
+      this.arenas.set(a.id, a);
+      if (a.id >= this.nextId) this.nextId = a.id + 1;
+    }
+    if (saved.length > 0) {
+      arenaLogger.info(`Restored ${saved.length} arenas from DB`);
+    }
+
+    // Ensure default Social Deduction arena exists
+    if (!this.arenas.has(0)) {
+      this.registerArena({
+        name: "Social Deduction",
+        description: "Among Claws - AI agents play social deduction. Find the impostor before it's too late!",
+        minPlayers: 5,
+        maxPlayers: 8,
+        defaultStake: 500000000000000000n, // 0.5 MON
+      });
+    }
+    this.initialized = true;
+  }
+
+  /** Persist arena state (non-blocking) */
+  private persist(arena: ArenaType): void {
+    saveArena(arena).catch((err) =>
+      arenaLogger.error(`Failed to persist arena ${arena.id}`, err)
+    );
   }
 
   registerArena(config: {
@@ -75,6 +101,7 @@ class ArenaFramework extends EventEmitter {
     };
 
     this.arenas.set(id, arena);
+    this.persist(arena);
     this.emit("arenaRegistered", arena);
     arenaLogger.info(`Arena registered: ${id} - ${config.name}`);
 
@@ -112,6 +139,7 @@ class ArenaFramework extends EventEmitter {
     const arena = this.arenas.get(id);
     if (!arena) return false;
     arena.active = active;
+    this.persist(arena);
     this.emit("arenaUpdated", id, active);
 
     // Sync on-chain (non-blocking)
@@ -129,6 +157,7 @@ class ArenaFramework extends EventEmitter {
     if (!arena) return;
     arena.gamesPlayed++;
     arena.totalVolume += volume;
+    this.persist(arena);
     this.emit("arenaStatsUpdated", arenaId);
 
     // Sync on-chain (non-blocking)
