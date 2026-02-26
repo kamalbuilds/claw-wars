@@ -2,6 +2,13 @@ import { EventEmitter } from "events";
 import { gameManager } from "./GameManager.js";
 import { GameResult } from "./GameRoom.js";
 import { logger } from "../utils/logger.js";
+import {
+  createTournamentOnChain,
+  startTournamentOnChain,
+  reportMatchResultOnChain,
+  cancelTournamentOnChain,
+} from "../chain/colosseum-contract.js";
+import { walletClient } from "../chain/client.js";
 
 const tournamentLogger = logger.child("TournamentManager");
 
@@ -32,6 +39,7 @@ export interface TournamentConfig {
 
 export interface TournamentData {
   id: string;
+  onChainId: bigint | null; // Corresponding ClawTournament contract ID
   name: string;
   entryFee: bigint;
   prizePool: bigint;
@@ -63,6 +71,7 @@ class TournamentManager extends EventEmitter {
 
     const tournament: TournamentData = {
       id,
+      onChainId: null,
       name,
       entryFee,
       prizePool: 0n,
@@ -81,6 +90,16 @@ class TournamentManager extends EventEmitter {
     this.tournaments.set(id, tournament);
     this.emit("tournamentCreated", tournament);
     tournamentLogger.info(`Tournament created: ${id} - ${name} (${maxParticipants} players)`);
+
+    // Fire on-chain transaction (non-blocking)
+    if (walletClient) {
+      const regDurationSec = BigInt(Math.floor(registrationDurationMs / 1000));
+      createTournamentOnChain(name, entryFee, maxParticipants, regDurationSec, BigInt(arenaType))
+        .then((hash) => {
+          if (hash) tournamentLogger.info(`Tournament ${id} on-chain tx: ${hash}`);
+        })
+        .catch((err) => tournamentLogger.error(`Tournament ${id} on-chain create failed`, err));
+    }
 
     return tournament;
   }
@@ -134,6 +153,19 @@ class TournamentManager extends EventEmitter {
 
     this.emit("tournamentStarted", tournamentId);
     tournamentLogger.info(`Tournament ${tournamentId} started with ${matchCount} round-1 matches`);
+
+    // Fire on-chain startTournament (non-blocking)
+    if (walletClient && t.onChainId !== null) {
+      const seededAddresses = seeded.filter((s): s is `0x${string}` => s.startsWith("0x")) as `0x${string}`[];
+      if (seededAddresses.length === seeded.length) {
+        startTournamentOnChain(t.onChainId, seededAddresses)
+          .then((hash) => {
+            if (hash) tournamentLogger.info(`Tournament ${tournamentId} on-chain start tx: ${hash}`);
+          })
+          .catch((err) => tournamentLogger.error(`Tournament ${tournamentId} on-chain start failed`, err));
+      }
+    }
+
     return true;
   }
 
@@ -199,7 +231,7 @@ class TournamentManager extends EventEmitter {
     return true;
   }
 
-  setMatchWinner(tournamentId: string, round: number, matchIndex: number, winner: string): boolean {
+  setMatchWinner(tournamentId: string, round: number, matchIndex: number, winner: string, gameId?: string): boolean {
     const t = this.tournaments.get(tournamentId);
     if (!t) return false;
 
@@ -212,6 +244,16 @@ class TournamentManager extends EventEmitter {
 
     this.emit("matchCompleted", tournamentId, round, matchIndex, winner);
     tournamentLogger.info(`Match ${round}-${matchIndex} in ${tournamentId} - winner set to ${winner}`);
+
+    // Report match result on-chain (non-blocking)
+    if (walletClient && t.onChainId !== null && winner.startsWith("0x")) {
+      const chainGameId = gameId ? BigInt(gameId.replace(/\D/g, "") || "0") : 0n;
+      reportMatchResultOnChain(t.onChainId, round, matchIndex, winner as `0x${string}`, chainGameId)
+        .then((hash) => {
+          if (hash) tournamentLogger.info(`Match ${round}-${matchIndex} on-chain report tx: ${hash}`);
+        })
+        .catch((err) => tournamentLogger.error(`Match ${round}-${matchIndex} on-chain report failed`, err));
+    }
 
     if (this.isRoundComplete(t, round)) {
       if (round === t.totalRounds) {
@@ -292,6 +334,16 @@ class TournamentManager extends EventEmitter {
 
     t.status = TournamentStatus.Cancelled;
     this.emit("tournamentCancelled", tournamentId);
+
+    // Cancel on-chain (non-blocking)
+    if (walletClient && t.onChainId !== null) {
+      cancelTournamentOnChain(t.onChainId)
+        .then((hash) => {
+          if (hash) tournamentLogger.info(`Tournament ${tournamentId} on-chain cancel tx: ${hash}`);
+        })
+        .catch((err) => tournamentLogger.error(`Tournament ${tournamentId} on-chain cancel failed`, err));
+    }
+
     return true;
   }
 
@@ -325,6 +377,7 @@ class TournamentManager extends EventEmitter {
 
     return {
       id: t.id,
+      onChainId: t.onChainId !== null ? t.onChainId.toString() : null,
       name: t.name,
       entryFee: t.entryFee.toString(),
       prizePool: t.prizePool.toString(),

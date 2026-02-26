@@ -1,5 +1,15 @@
 import { EventEmitter } from "events";
 import { logger } from "../utils/logger.js";
+import {
+  createSeasonOnChain,
+  startSeasonOnChain,
+  endSeasonOnChain,
+  recordGameOnChain,
+  recordTournamentWinOnChain,
+  recordCorrectVoteOnChain,
+  updateNFTGameStats,
+} from "../chain/colosseum-contract.js";
+import { walletClient } from "../chain/client.js";
 
 const seasonLogger = logger.child("SeasonTracker");
 
@@ -20,6 +30,7 @@ export interface SeasonPlayerStats {
 
 export interface SeasonData {
   id: string;
+  onChainId: bigint | null; // Corresponding ClawSeason contract ID
   name: string;
   startTime: number;
   endTime: number;
@@ -52,6 +63,7 @@ class SeasonTracker extends EventEmitter {
 
     const season: SeasonData = {
       id,
+      onChainId: null,
       name: config.name,
       startTime: config.startTime,
       endTime: config.endTime,
@@ -65,6 +77,17 @@ class SeasonTracker extends EventEmitter {
     this.emit("seasonCreated", season);
     seasonLogger.info(`Season created: ${id} - ${config.name}`);
 
+    // Fire on-chain (non-blocking)
+    if (walletClient) {
+      const startTimeSec = BigInt(Math.floor(config.startTime / 1000));
+      const endTimeSec = BigInt(Math.floor(config.endTime / 1000));
+      createSeasonOnChain(config.name, startTimeSec, endTimeSec, config.topRewardSlots)
+        .then((hash) => {
+          if (hash) seasonLogger.info(`Season ${id} on-chain tx: ${hash}`);
+        })
+        .catch((err) => seasonLogger.error(`Season ${id} on-chain create failed`, err));
+    }
+
     return season;
   }
 
@@ -76,6 +99,16 @@ class SeasonTracker extends EventEmitter {
     this.currentSeasonId = seasonId;
     this.emit("seasonStarted", seasonId);
     seasonLogger.info(`Season started: ${seasonId}`);
+
+    // Fire on-chain (non-blocking)
+    if (walletClient && s.onChainId !== null) {
+      startSeasonOnChain(s.onChainId)
+        .then((hash) => {
+          if (hash) seasonLogger.info(`Season ${seasonId} on-chain start tx: ${hash}`);
+        })
+        .catch((err) => seasonLogger.error(`Season ${seasonId} on-chain start failed`, err));
+    }
+
     return true;
   }
 
@@ -87,6 +120,16 @@ class SeasonTracker extends EventEmitter {
     if (this.currentSeasonId === seasonId) this.currentSeasonId = null;
     this.emit("seasonEnded", seasonId);
     seasonLogger.info(`Season ended: ${seasonId}`);
+
+    // Fire on-chain (non-blocking)
+    if (walletClient && s.onChainId !== null) {
+      endSeasonOnChain(s.onChainId)
+        .then((hash) => {
+          if (hash) seasonLogger.info(`Season ${seasonId} on-chain end tx: ${hash}`);
+        })
+        .catch((err) => seasonLogger.error(`Season ${seasonId} on-chain end failed`, err));
+    }
+
     return true;
   }
 
@@ -113,6 +156,20 @@ class SeasonTracker extends EventEmitter {
     }
 
     this.emit("gameRecorded", season.id, address, won);
+
+    // Record on-chain: season stats + NFT stats (non-blocking)
+    if (walletClient && address.startsWith("0x")) {
+      const agent = address as `0x${string}`;
+      if (season.onChainId !== null) {
+        recordGameOnChain(season.onChainId, agent, won).catch((err) =>
+          seasonLogger.error(`On-chain recordGame failed for ${address}`, err)
+        );
+      }
+      // Also update agent NFT stats (if they have one)
+      updateNFTGameStats(agent, won).catch((err) =>
+        seasonLogger.error(`On-chain NFT stats update failed for ${address}`, err)
+      );
+    }
   }
 
   recordTournamentWin(address: string): void {
@@ -124,6 +181,13 @@ class SeasonTracker extends EventEmitter {
     stats.points += POINTS_PER_TOURNAMENT_WIN;
 
     this.emit("tournamentWinRecorded", season.id, address);
+
+    // Record on-chain (non-blocking)
+    if (walletClient && address.startsWith("0x") && season.onChainId !== null) {
+      recordTournamentWinOnChain(season.onChainId, address as `0x${string}`).catch((err) =>
+        seasonLogger.error(`On-chain recordTournamentWin failed for ${address}`, err)
+      );
+    }
   }
 
   recordCorrectVote(address: string): void {
@@ -133,6 +197,13 @@ class SeasonTracker extends EventEmitter {
     const stats = this.ensurePlayer(season, address);
     stats.correctVotes++;
     stats.points += POINTS_PER_CORRECT_VOTE;
+
+    // Record on-chain (non-blocking)
+    if (walletClient && address.startsWith("0x") && season.onChainId !== null) {
+      recordCorrectVoteOnChain(season.onChainId, address as `0x${string}`).catch((err) =>
+        seasonLogger.error(`On-chain recordCorrectVote failed for ${address}`, err)
+      );
+    }
   }
 
   addBonusPoints(address: string, points: number, reason: string): void {
@@ -189,6 +260,7 @@ class SeasonTracker extends EventEmitter {
 
     return {
       id: s.id,
+      onChainId: s.onChainId !== null ? s.onChainId.toString() : null,
       name: s.name,
       startTime: s.startTime,
       endTime: s.endTime,

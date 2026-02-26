@@ -1,5 +1,11 @@
 import { EventEmitter } from "events";
 import { logger } from "../utils/logger.js";
+import {
+  registerArenaOnChain,
+  setArenaActiveOnChain,
+  recordArenaGamePlayedOnChain,
+} from "../chain/colosseum-contract.js";
+import { walletClient } from "../chain/client.js";
 
 const arenaLogger = logger.child("ArenaFramework");
 
@@ -72,6 +78,21 @@ class ArenaFramework extends EventEmitter {
     this.emit("arenaRegistered", arena);
     arenaLogger.info(`Arena registered: ${id} - ${config.name}`);
 
+    // Register on-chain (non-blocking)
+    if (walletClient) {
+      registerArenaOnChain(
+        config.name,
+        config.description,
+        BigInt(config.minPlayers),
+        BigInt(config.maxPlayers),
+        config.defaultStake
+      )
+        .then((hash) => {
+          if (hash) arenaLogger.info(`Arena ${id} on-chain register tx: ${hash}`);
+        })
+        .catch((err) => arenaLogger.error(`Arena ${id} on-chain register failed`, err));
+    }
+
     return arena;
   }
 
@@ -92,6 +113,14 @@ class ArenaFramework extends EventEmitter {
     if (!arena) return false;
     arena.active = active;
     this.emit("arenaUpdated", id, active);
+
+    // Sync on-chain (non-blocking)
+    if (walletClient) {
+      setArenaActiveOnChain(BigInt(id), active).catch((err) =>
+        arenaLogger.error(`Arena ${id} on-chain setActive failed`, err)
+      );
+    }
+
     return true;
   }
 
@@ -101,6 +130,13 @@ class ArenaFramework extends EventEmitter {
     arena.gamesPlayed++;
     arena.totalVolume += volume;
     this.emit("arenaStatsUpdated", arenaId);
+
+    // Sync on-chain (non-blocking)
+    if (walletClient) {
+      recordArenaGamePlayedOnChain(BigInt(arenaId), volume).catch((err) =>
+        arenaLogger.error(`Arena ${arenaId} on-chain recordGamePlayed failed`, err)
+      );
+    }
   }
 
   getState(): object {
